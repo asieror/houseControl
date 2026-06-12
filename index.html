@@ -1,0 +1,1202 @@
+<!DOCTYPE html>
+<html lang="es" class="h-full bg-slate-950 text-slate-100">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Casa Control - Gestión de Gastos, Entrada e Hipoteca</title>
+    <!-- Tailwind CSS Play CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0f9ff',
+                            100: '#e0f2fe',
+                            500: '#0ea5e9',
+                            600: '#0284c7',
+                            700: '#0369a1',
+                            900: '#0c4a6e',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Google Fonts Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0f172a;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #0ea5e9;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-fadeIn {
+            animation: fadeIn 0.4s ease-out forwards;
+        }
+    </style>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- React & Babel CDNs -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body class="h-full antialiased text-slate-200">
+
+    <div id="root" class="min-h-screen flex flex-col bg-slate-950"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef, useMemo } = React;
+
+        // --- CONSTANTES Y DATOS POR DEFECTO ---
+        const DEFAULT_META_TOTAL = 66629.20;
+        const DEFAULT_METAS = [
+            { id: 'm1', label: '10% Entrada Piso', amount: 34870, completed: false, desc: 'Primer hito principal de reserva y firma de contrato' },
+            { id: 'm2', label: 'IVA & Gastos de Compra', amount: 27896, completed: false, desc: 'Gastos de gestoría, notaría e impuestos correspondientes' },
+            { id: 'm3', label: 'Personalización de Vivienda', amount: 3863.20, completed: false, desc: 'Mejoras y adaptaciones de acabados de la constructora' }
+        ];
+        const DEFAULT_SALDO_INICIAL = 8164.00;
+
+        const DEFAULT_CONTRIBUTIONS = [
+            { id: "m1", name: "Marzo (Año 1)", laura: 1266, asier: 850, revolut: 8620, simulacion: 2012 },
+            { id: "m2", name: "Abril (Año 1)", laura: 1266, asier: 850, revolut: 9075, simulacion: 2009 },
+            { id: "m3", name: "Mayo (Año 1)", laura: 1266, asier: 850, revolut: 9531, simulacion: 2005 },
+            { id: "m4", name: "Junio (Año 1)", laura: 1266, asier: 850, revolut: 9986, simulacion: 2002 },
+            { id: "m5", name: "Julio (Año 1)", laura: 1266, asier: 850, revolut: 10442, simulacion: 1999 },
+            { id: "m6", name: "Agosto (Año 1)", laura: 1266, asier: 1200, revolut: 11210, simulacion: 1995 },
+            { id: "m7", name: "Septiembre (Año 1)", laura: 1266, asier: 1200, revolut: 11980, simulacion: 1991 },
+            { id: "m8", name: "Octubre (Año 1)", laura: 1266, asier: 1200, revolut: 12749, simulacion: 1988 },
+            { id: "m9", name: "Noviembre (Año 1)", laura: 1266, asier: 1200, revolut: 13519, simulacion: 1984 },
+            { id: "m10", name: "Diciembre (Año 1)", laura: 1266, asier: 1500, revolut: 14588, simulacion: 1980 },
+            { id: "m11", name: "Enero (Año 2)", laura: 1266, asier: 1500, revolut: 15657, simulacion: 1976 },
+            { id: "m12", name: "Febrero (Año 2)", laura: 1266, asier: 1500, revolut: 16726, simulacion: 1972 },
+            { id: "m13", name: "Marzo (Año 2)", laura: 800, asier: 1500, revolut: 16867, simulacion: 1749 },
+            { id: "m14", name: "Abril (Año 2)", laura: 800, asier: 1500, revolut: 17163, simulacion: 1746 },
+            { id: "m15", name: "Mayo (Año 2)", laura: 800, asier: 1500, revolut: 17460, simulacion: 1742 },
+            { id: "m16", name: "Junio (Año 2)", laura: 800, asier: 1500, revolut: 18001, simulacion: 1714 },
+            { id: "m17", name: "Julio (Año 2)", laura: 800, asier: 1500, revolut: 18801, simulacion: 1685 },
+            { id: "m18", name: "Agosto (Año 2)", laura: 800, asier: 2000, revolut: 19940, simulacion: 1527 },
+            { id: "m19", name: "Septiembre (Año 2)", laura: 800, asier: 1500, revolut: 20580, simulacion: 1450 },
+            { id: "m20", name: "Octubre (Año 2)", laura: 800, asier: 1500, revolut: 21219, simulacion: 1373 }
+        ];
+
+        // --- LISTADO DE PRESUPUESTO DE MUEBLES ---
+        const DEFAULT_FURNITURE_BUDGET = [
+            { id: 'f1', category: 'Cocina & Electrodomésticos', item: 'Frigorífico, horno, inducción y lavavajillas', amount: 4500, spent: 0, status: 'Pendiente', priority: 'Alta' },
+            { id: 'f2', category: 'Salón', item: 'Sofá chaise longue cómodo', amount: 1800, spent: 0, status: 'Pendiente', priority: 'Alta' },
+            { id: 'f3', category: 'Salón', item: 'Mueble de TV y mesa de comedor con sillas', amount: 1500, spent: 0, status: 'Pendiente', priority: 'Media' },
+            { id: 'f4', category: 'Dormitorio Principal', item: 'Estructura de cama, colchón viscoelástico y armarios', amount: 2500, spent: 0, status: 'Pendiente', priority: 'Alta' },
+            { id: 'f5', category: 'Iluminación', item: 'Lámparas LED y focos para toda la casa', amount: 1000, spent: 0, status: 'Pendiente', priority: 'Baja' },
+            { id: 'f6', category: 'Dormitorio Secundario / Despacho', item: 'Mesa de escritorio, silla ergonómica y estantería', amount: 1200, spent: 0, status: 'Pendiente', priority: 'Media' },
+            { id: 'f7', category: 'Baños & Decoración', item: 'Mamparas, espejos retroiluminados y detalles', amount: 1500, spent: 0, status: 'Pendiente', priority: 'Baja' },
+            { id: 'f8', category: 'Fondo de Imprevistos Mudanza', item: 'Cajas, transporte y pequeños detalles', amount: 1000, spent: 0, status: 'Pendiente', priority: 'Media' }
+        ];
+
+        function App() {
+            // Estados principales
+            const [currentTab, setCurrentTab] = useState('dashboard');
+            const [metaTotal, setMetaTotal] = useState(DEFAULT_META_TOTAL);
+            const [saldoInicial, setSaldoInicial] = useState(DEFAULT_SALDO_INICIAL);
+            const [contributions, setContributions] = useState(DEFAULT_CONTRIBUTIONS);
+            const [houseMetas, setHouseMetas] = useState(DEFAULT_METAS);
+            const [furnitureBudget, setFurnitureBudget] = useState(DEFAULT_FURNITURE_BUDGET);
+            
+            // Proyección dinámica slider (Ahorro objetivo mensual conjunto)
+            const [targetMonthlySaving, setTargetMonthlySaving] = useState(2300);
+
+            // Simulación Hipoteca
+            const [interestRate, setInterestRate] = useState(3.0);
+            const [loanTermYears, setLoanTermYears] = useState(30);
+
+            // Firebase setup states
+            const [firebaseConfig, setFirebaseConfig] = useState(() => {
+                const saved = localStorage.getItem('casa_firebase_config');
+                return saved ? JSON.parse(saved) : null;
+            });
+            const [firebaseStatus, setFirebaseStatus] = useState('demo');
+            const [firebaseConfigForm, setFirebaseConfigForm] = useState({
+                apiKey: "", authDomain: "", projectId: "", storageBucket: "", messagingSenderId: "", appId: ""
+            });
+
+            // Notificaciones
+            const [notifications, setNotifications] = useState([]);
+            const addNotification = (message, type = 'success') => {
+                const id = Date.now();
+                setNotifications(prev => [...prev, { id, message, type }]);
+                setTimeout(() => {
+                    setNotifications(prev => prev.filter(n => n.id !== id));
+                }, 4000);
+            };
+
+            const dbRef = useRef(null);
+            const authRef = useRef(null);
+            const syncUnsubscribe = useRef(null);
+
+            // Cargar datos locales o sincronizar
+            useEffect(() => {
+                if (firebaseConfig) {
+                    setFirebaseConfigForm(firebaseConfig);
+                    connectFirebase(firebaseConfig);
+                } else {
+                    const localData = localStorage.getItem('casa_local_contributions');
+                    const localMeta = localStorage.getItem('casa_local_meta');
+                    const localSaldo = localStorage.getItem('casa_local_saldo');
+                    const localMetas = localStorage.getItem('casa_local_metas');
+                    const localFurniture = localStorage.getItem('casa_local_furniture');
+                    if (localData) setContributions(JSON.parse(localData));
+                    if (localMeta) setMetaTotal(parseFloat(localMeta));
+                    if (localSaldo) setSaldoInicial(parseFloat(localSaldo));
+                    if (localMetas) setHouseMetas(JSON.parse(localMetas));
+                    if (localFurniture) setFurnitureBudget(JSON.parse(localFurniture));
+                }
+                return () => {
+                    if (syncUnsubscribe.current) syncUnsubscribe.current();
+                };
+            }, []);
+
+            // Conexión a Firebase
+            const connectFirebase = async (config) => {
+                setFirebaseStatus('connecting');
+                try {
+                    const { initializeApp } = await import('https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js');
+                    const { getAuth, signInAnonymously, onAuthStateChanged } = await import('https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js');
+                    const { getFirestore, doc, getDoc, setDoc, collection, onSnapshot } = await import('https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js');
+
+                    const app = initializeApp(config);
+                    const auth = getAuth(app);
+                    const db = getFirestore(app);
+
+                    authRef.current = auth;
+                    dbRef.current = db;
+
+                    await signInAnonymously(auth);
+
+                    onAuthStateChanged(auth, (user) => {
+                        if (user) {
+                            setFirebaseStatus('connected');
+                            addNotification("Sincronizado con Firebase Firestore", "success");
+                            
+                            const appIdSlug = config.projectId || 'casa-revolut-app';
+                            const pathConfig = doc(db, 'artifacts', appIdSlug, 'public', 'data', 'config', 'meta_config');
+                            
+                            onSnapshot(pathConfig, (docSnap) => {
+                                if (docSnap.exists()) {
+                                    const data = docSnap.data();
+                                    if (data.metaTotal) setMetaTotal(data.metaTotal);
+                                    if (data.saldoInicial) setSaldoInicial(data.saldoInicial);
+                                    if (data.houseMetas) setHouseMetas(data.houseMetas);
+                                    if (data.furnitureBudget) setFurnitureBudget(data.furnitureBudget);
+                                }
+                            });
+
+                            const contribCollection = collection(db, 'artifacts', appIdSlug, 'public', 'data', 'contributions');
+                            if (syncUnsubscribe.current) syncUnsubscribe.current();
+                            
+                            syncUnsubscribe.current = onSnapshot(contribCollection, (querySnap) => {
+                                const list = [];
+                                querySnap.forEach((doc) => {
+                                    list.push({ id: doc.id, ...doc.data() });
+                                });
+                                if (list.length > 0) {
+                                    list.sort((a, b) => (a.order || 0) - (b.order || 0));
+                                    setContributions(list);
+                                }
+                            });
+                        }
+                    });
+                } catch (error) {
+                    console.error(error);
+                    setFirebaseStatus('error');
+                    addNotification("Error conectando a Firebase, usando almacenamiento local", "error");
+                }
+            };
+
+            const persistData = async (updatedContribs, updatedMeta, updatedSaldo, updatedMetas, updatedFurniture) => {
+                const mTotal = updatedMeta !== undefined ? updatedMeta : metaTotal;
+                const sInicial = updatedSaldo !== undefined ? updatedSaldo : saldoInicial;
+                const listContribs = updatedContribs !== undefined ? updatedContribs : contributions;
+                const hMetas = updatedMetas !== undefined ? updatedMetas : houseMetas;
+                const fBudget = updatedFurniture !== undefined ? updatedFurniture : furnitureBudget;
+
+                if (firebaseStatus === 'connected' && dbRef.current) {
+                    try {
+                        const { doc, setDoc } = await import('https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js');
+                        const appIdSlug = firebaseConfig.projectId || 'casa-revolut-app';
+                        
+                        await setDoc(doc(dbRef.current, 'artifacts', appIdSlug, 'public', 'data', 'config', 'meta_config'), {
+                            metaTotal: mTotal,
+                            saldoInicial: sInicial,
+                            houseMetas: hMetas,
+                            furnitureBudget: fBudget
+                        });
+
+                        for (let i = 0; i < listContribs.length; i++) {
+                            const month = listContribs[i];
+                            await setDoc(doc(dbRef.current, 'artifacts', appIdSlug, 'public', 'data', 'contributions', month.id), {
+                                name: month.name,
+                                laura: Number(month.laura),
+                                asier: Number(month.asier),
+                                revolut: Number(month.revolut),
+                                simulacion: Number(month.simulacion),
+                                order: i
+                            });
+                        }
+                    } catch (err) {
+                        console.error(err);
+                    }
+                } else {
+                    localStorage.setItem('casa_local_contributions', JSON.stringify(listContribs));
+                    localStorage.setItem('casa_local_meta', mTotal.toString());
+                    localStorage.setItem('casa_local_saldo', sInicial.toString());
+                    localStorage.setItem('casa_local_metas', JSON.stringify(hMetas));
+                    localStorage.setItem('casa_local_furniture', JSON.stringify(fBudget));
+                }
+            };
+
+            // --- CÁLCULOS DINÁMICOS DE APORTACIONES ---
+            const processedData = useMemo(() => {
+                let currentAccumulated = saldoInicial;
+                let totalLaura = 0;
+                let totalAsier = 0;
+                let totalSimulacion = saldoInicial;
+
+                const rows = contributions.map((c) => {
+                    const totalMes = Number(c.laura) + Number(c.asier);
+                    currentAccumulated += totalMes;
+                    totalLaura += Number(c.laura);
+                    totalAsier += Number(c.asier);
+                    totalSimulacion += Number(c.simulacion || 0);
+
+                    const pendiente = Math.max(0, metaTotal - currentAccumulated);
+                    const diferencia50_50 = totalLaura - totalAsier;
+                    const diferenciaVsPlan = currentAccumulated - totalSimulacion;
+
+                    return {
+                        ...c,
+                        totalMes,
+                        acumulado: currentAccumulated,
+                        pendiente,
+                        diferencia50_50,
+                        totalLauraAcumulado: totalLaura,
+                        totalAsierAcumulado: totalAsier,
+                        simulacionAcumulado: totalSimulacion,
+                        diferenciaVsPlan
+                    };
+                });
+
+                const totalAhorrado = currentAccumulated;
+                const porcentajeProgreso = Math.min(100, (totalAhorrado / metaTotal) * 100);
+                const saldoRevolutActual = contributions.length > 0 ? Number(contributions[contributions.length - 1].revolut) : saldoInicial;
+
+                // Total muebles
+                const totalMueblesPresupuesto = furnitureBudget.reduce((sum, item) => sum + item.amount, 0);
+                const totalMueblesGastado = furnitureBudget.reduce((sum, item) => sum + item.spent, 0);
+
+                return {
+                    rows,
+                    totalAhorrado,
+                    porcentajeProgreso,
+                    totalLaura,
+                    totalAsier,
+                    saldoRevolutActual,
+                    totalSimulacion,
+                    totalMueblesPresupuesto,
+                    totalMueblesGastado
+                };
+            }, [contributions, metaTotal, saldoInicial, furnitureBudget]);
+
+            // --- PROYECCIONES DE TIEMPO Y CONSEJOS ---
+            const projections = useMemo(() => {
+                const restanteCasa = Math.max(0, metaTotal - processedData.totalAhorrado);
+                const restanteMuebles = Math.max(0, processedData.totalMueblesPresupuesto - processedData.totalMueblesGastado);
+                const totalRestanteProyectoCompleto = restanteCasa + restanteMuebles;
+
+                // Promedio de ahorro mensual actual (últimos 3 meses como velocidad real)
+                let actualMonthlyVelocity = 2300; 
+                if (contributions.length >= 3) {
+                    const last3 = contributions.slice(-3);
+                    const sum = last3.reduce((s, c) => s + Number(c.laura) + Number(c.asier), 0);
+                    actualMonthlyVelocity = sum / 3;
+                }
+
+                // Meses para casa y completo con la velocidad del slider
+                const mesesParaCasa = Math.ceil(restanteCasa / targetMonthlySaving);
+                const mesesParaCompleto = Math.ceil(totalRestanteProyectoCompleto / targetMonthlySaving);
+
+                // Fechas proyectadas
+                const hoy = new Date();
+                const fechaCasa = new Date(hoy.getFullYear(), hoy.getMonth() + mesesParaCasa, 1);
+                const fechaCompleto = new Date(hoy.getFullYear(), hoy.getMonth() + mesesParaCompleto, 1);
+
+                const formatOptions = { month: 'long', year: 'numeric' };
+                const fechaCasaLabel = fechaCasa.toLocaleDateString('es-ES', formatOptions);
+                const fechaCompletoLabel = fechaCompleto.toLocaleDateString('es-ES', formatOptions);
+
+                return {
+                    restanteCasa,
+                    restanteMuebles,
+                    totalRestanteProyectoCompleto,
+                    actualMonthlyVelocity,
+                    mesesParaCasa,
+                    mesesParaCompleto,
+                    fechaCasaLabel,
+                    fechaCompletoLabel
+                };
+            }, [processedData, targetMonthlySaving, metaTotal, contributions]);
+
+            // --- SIMULADOR HIPOTECA ---
+            // Precio de la vivienda se asume con los 34.870 de entrada correspondientes al 10%. 
+            // Esto estima una vivienda de 348.700 euros.
+            const hipotecaData = useMemo(() => {
+                const valorVivienda = 348700;
+                const prestamoHipotecario = valorVivienda * 0.8; // Financiación estándar 80%
+                
+                // Cuota mensual francesa
+                const r = (interestRate / 100) / 12;
+                const n = loanTermYears * 12;
+                
+                let cuotaMensual = 0;
+                if (r > 0) {
+                    cuotaMensual = (prestamoHipotecario * r * Math.pow(1 + r, n)) / (Math.pow(1 + r, n) - 1);
+                } else {
+                    cuotaMensual = prestamoHipotecario / n;
+                }
+
+                const totalPagado = cuotaMensual * n;
+                const totalIntereses = totalPagado - prestamoHipotecario;
+
+                return {
+                    valorVivienda,
+                    prestamoHipotecario,
+                    cuotaMensual,
+                    totalPagado,
+                    totalIntereses
+                };
+            }, [interestRate, loanTermYears]);
+
+            // --- GESTIÓN DE EDICIONES DE MESES ---
+            const [editingMonth, setEditingMonth] = useState(null);
+            const [editForm, setEditForm] = useState({ name: "", laura: 0, asier: 0, revolut: 0, simulacion: 0 });
+
+            const startEdit = (month) => {
+                setEditingMonth(month.id);
+                setEditForm({
+                    name: month.name,
+                    laura: month.laura,
+                    asier: month.asier,
+                    revolut: month.revolut,
+                    simulacion: month.simulacion
+                });
+            };
+
+            const saveEdit = () => {
+                const updated = contributions.map(c => {
+                    if (c.id === editingMonth) {
+                        return {
+                            ...c,
+                            name: editForm.name,
+                            laura: Number(editForm.laura),
+                            asier: Number(editForm.asier),
+                            revolut: Number(editForm.revolut),
+                            simulacion: Number(editForm.simulacion)
+                        };
+                    }
+                    return c;
+                });
+                setContributions(updated);
+                setEditingMonth(null);
+                persistData(updated);
+                addNotification("Mes actualizado correctamente");
+            };
+
+            const addNewMonth = () => {
+                const nextNum = contributions.length + 1;
+                const lastMonth = contributions[contributions.length - 1];
+                const newMonth = {
+                    id: 'm_' + Date.now(),
+                    name: `Mes ${nextNum}`,
+                    laura: lastMonth ? lastMonth.laura : 800,
+                    asier: lastMonth ? lastMonth.asier : 1500,
+                    revolut: lastMonth ? lastMonth.revolut + (lastMonth.laura + lastMonth.asier) : saldoInicial + 2300,
+                    simulacion: lastMonth ? lastMonth.simulacion : 1373
+                };
+                const updated = [...contributions, newMonth];
+                setContributions(updated);
+                persistData(updated);
+                addNotification("Añadido nuevo mes planificado");
+            };
+
+            const deleteMonth = (id) => {
+                if (window.confirm("¿Seguro que deseas eliminar este registro mensual?")) {
+                    const updated = contributions.filter(c => c.id !== id);
+                    setContributions(updated);
+                    persistData(updated);
+                    addNotification("Mes eliminado del histórico", "info");
+                }
+            };
+
+            // --- GESTIÓN DE MUEBLES ---
+            const [newFurniture, setNewFurniture] = useState({ category: "", item: "", amount: 0, priority: "Media" });
+            const addFurnitureItem = () => {
+                if (!newFurniture.category || !newFurniture.item || !newFurniture.amount) {
+                    addNotification("Por favor, rellena todos los campos del mueble", "error");
+                    return;
+                }
+                const newItem = {
+                    id: 'f_' + Date.now(),
+                    category: newFurniture.category,
+                    item: newFurniture.item,
+                    amount: Number(newFurniture.amount),
+                    spent: 0,
+                    status: 'Pendiente',
+                    priority: newFurniture.priority
+                };
+                const updated = [...furnitureBudget, newItem];
+                setFurnitureBudget(updated);
+                persistData(contributions, metaTotal, saldoInicial, houseMetas, updated);
+                setNewFurniture({ category: "", item: "", amount: 0, priority: "Media" });
+                addNotification("Partida de mueble añadida");
+            };
+
+            const deleteFurnitureItem = (id) => {
+                const updated = furnitureBudget.filter(f => f.id !== id);
+                setFurnitureBudget(updated);
+                persistData(contributions, metaTotal, saldoInicial, houseMetas, updated);
+                addNotification("Partida de mueble eliminada");
+            };
+
+            const toggleFurnitureStatus = (id) => {
+                const updated = furnitureBudget.map(f => {
+                    if (f.id === id) {
+                        const newStatus = f.status === 'Comprado' ? 'Pendiente' : 'Comprado';
+                        return {
+                            ...f,
+                            status: newStatus,
+                            spent: newStatus === 'Comprado' ? f.amount : 0
+                        };
+                    }
+                    return f;
+                });
+                setFurnitureBudget(updated);
+                persistData(contributions, metaTotal, saldoInicial, houseMetas, updated);
+                addNotification("Estado del presupuesto actualizado");
+            };
+
+            // --- CSV IMPORT UTILITIES ---
+            const handleCSVUpload = (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    parseCSVData(event.target.result);
+                };
+                reader.readAsText(file);
+            };
+
+            const parseCSVData = (text) => {
+                try {
+                    const lines = text.split('\n');
+                    let parsedMeta = DEFAULT_META_TOTAL;
+                    let parsedSaldo = DEFAULT_SALDO_INICIAL;
+                    let parsedMetas = [...DEFAULT_METAS];
+                    const parsedMonthly = [];
+
+                    lines.forEach(line => {
+                        const cols = line.split(',');
+                        if (cols.length < 2) return;
+
+                        const cleanText = (str) => str ? str.trim().replace(/"/g, '') : '';
+                        const cleanNum = (str) => {
+                            if (!str) return 0;
+                            let val = str.trim().replace(/"/g, '').replace('€', '').replace(/\s/g, '');
+                            if (val.includes('.') && val.includes(',')) {
+                                val = val.replace(/\./g, '').replace(',', '.');
+                            } else if (val.includes(',')) {
+                                val = val.replace(',', '.');
+                            }
+                            return parseFloat(val) || 0;
+                        };
+
+                        const label = cleanText(cols[1]);
+                        const val = cols[2];
+
+                        if (label.includes("10% Entrada Piso")) parsedMetas[0].amount = cleanNum(val);
+                        else if (label.includes("IVA (Gastos)")) parsedMetas[1].amount = cleanNum(val);
+                        else if (label.includes("Personalización")) parsedMetas[2].amount = cleanNum(val);
+                        else if (label.includes("META TOTAL")) parsedMeta = cleanNum(val);
+                        else if (label.includes("Saldo Inicial Real")) parsedSaldo = cleanNum(val);
+
+                        const idx = parseInt(cols[0]);
+                        if (!isNaN(idx) && idx > 0 && cols.length >= 6) {
+                            parsedMonthly.push({
+                                id: 'm_imported_' + idx + '_' + Date.now(),
+                                name: cleanText(cols[1]),
+                                laura: cleanNum(cols[2]),
+                                asier: cleanNum(cols[3]),
+                                revolut: cleanNum(cols[5]),
+                                simulacion: cleanNum(cols[11]) || cleanNum(cols[4])
+                            });
+                        }
+                    });
+
+                    if (parsedMonthly.length > 0) {
+                        setMetaTotal(parsedMeta);
+                        setSaldoInicial(parsedSaldo);
+                        setHouseMetas(parsedMetas);
+                        setContributions(parsedMonthly);
+                        persistData(parsedMonthly, parsedMeta, parsedSaldo, parsedMetas);
+                        addNotification("Importación de CSV completada", "success");
+                    }
+                } catch (err) {
+                    addNotification("Error procesando CSV", "error");
+                }
+            };
+
+            return (
+                <div class="flex-1 flex flex-col min-h-screen">
+                    {/* ENCABEZADO PREMIUM */}
+                    <header class="bg-slate-900 border-b border-slate-800 py-4 px-6 sticky top-0 z-40 shadow-xl">
+                        <div class="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
+                            <div class="flex items-center gap-4">
+                                <div class="p-3 bg-gradient-to-tr from-cyan-600 to-sky-400 rounded-2xl shadow-lg shadow-sky-500/20 text-white">
+                                    <i data-lucide="home" class="w-6 h-6"></i>
+                                </div>
+                                <div>
+                                    <h1 class="text-xl font-extrabold tracking-tight text-white flex items-center gap-2">
+                                        Nuestra Casa <span class="text-[10px] uppercase font-black tracking-widest bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 px-2 py-0.5 rounded-md">Workspace</span>
+                                    </h1>
+                                    <p class="text-xs text-slate-400">Panel financiero inteligente para el control del ahorro y el plan futuro</p>
+                                </div>
+                            </div>
+
+                            {/* ESTADOS DE SINCRONIZACIÓN */}
+                            <div class="flex flex-wrap items-center gap-3">
+                                {firebaseStatus === 'connected' ? (
+                                    <span class="flex items-center gap-1.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 px-3 py-1.5 rounded-xl text-xs font-bold">
+                                        <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                                        Sincronizado en la Nube
+                                    </span>
+                                ) : (
+                                    <span class="flex items-center gap-1.5 bg-blue-500/10 border border-blue-500/20 text-blue-400 px-3 py-1.5 rounded-xl text-xs font-bold">
+                                        <span class="w-2 h-2 rounded-full bg-blue-400"></span>
+                                        Base de datos local segura
+                                    </span>
+                                )}
+                            </div>
+                        </div>
+                    </header>
+
+                    {/* BANNER DE NOTIFICACIONES */}
+                    <div class="fixed bottom-6 right-6 z-50 flex flex-col gap-2 max-w-sm">
+                        {notifications.map(n => (
+                            <div key={n.id} class={`flex items-center gap-2.5 p-3.5 rounded-2xl shadow-2xl border text-sm font-semibold animate-fadeIn ${
+                                n.type === 'success' ? 'bg-emerald-950/95 text-emerald-300 border-emerald-500/30' :
+                                n.type === 'error' ? 'bg-rose-950/95 text-rose-300 border-rose-500/30' :
+                                'bg-slate-900/95 text-slate-200 border-slate-700'
+                            }`}>
+                                <i data-lucide={n.type === 'success' ? 'check-circle' : n.type === 'error' ? 'alert-triangle' : 'info'} class="w-4 h-4 text-brand-400"></i>
+                                <span>{n.message}</span>
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* PROGRESO INTEGRADO GLOBAL */}
+                    <div class="bg-slate-900/50 px-6 py-3 border-b border-slate-800">
+                        <div class="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
+                            <div class="w-full md:w-2/3 space-y-1">
+                                <div class="flex justify-between text-xs text-slate-400 font-bold">
+                                    <span>HITO ACUMULADO GLOBAL (Entrada, IVA y Personalización)</span>
+                                    <span>{processedData.porcentajeProgreso.toFixed(1)}%</span>
+                                </div>
+                                <div class="w-full bg-slate-800 rounded-full h-3.5 relative overflow-hidden p-0.5">
+                                    <div class="bg-gradient-to-r from-cyan-500 via-indigo-500 to-purple-500 h-full rounded-full transition-all duration-1000" style={{ width: `${processedData.porcentajeProgreso}%` }}></div>
+                                </div>
+                            </div>
+                            <div class="text-right shrink-0">
+                                <div class="text-lg font-black text-white">{processedData.totalAhorrado.toLocaleString('es-ES', { minimumFractionDigits: 2 })} €</div>
+                                <div class="text-[10px] text-slate-400 font-semibold uppercase">de un total necesario de {metaTotal.toLocaleString('es-ES')} €</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* NAVEGADOR DE CONTENIDO */}
+                    <main class="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+                        
+                        {/* Selector de Pestañas (Lateral Izquierdo) */}
+                        <div class="lg:col-span-3 flex flex-row lg:flex-col gap-1.5 overflow-x-auto pb-3 lg:pb-0 border-b lg:border-b-0 lg:border-r border-slate-800/60 lg:pr-4">
+                            <button onClick={() => setCurrentTab('dashboard')} class={`flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-bold uppercase tracking-wider transition shrink-0 ${currentTab === 'dashboard' ? 'bg-cyan-500/10 border border-cyan-500/20 text-cyan-400' : 'hover:bg-slate-900 text-slate-400'}`}>
+                                <i data-lucide="layout-dashboard" class="w-4 h-4"></i>
+                                Mi Cuenta Revolut
+                            </button>
+                            <button onClick={() => setCurrentTab('simulation')} class={`flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-bold uppercase tracking-wider transition shrink-0 ${currentTab === 'simulation' ? 'bg-cyan-500/10 border border-cyan-500/20 text-cyan-400' : 'hover:bg-slate-900 text-slate-400'}`}>
+                                <i data-lucide="calculator" class="w-4 h-4"></i>
+                                Control Histórico
+                            </button>
+                            <button onClick={() => setCurrentTab('projections')} class={`flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-bold uppercase tracking-wider transition shrink-0 ${currentTab === 'projections' ? 'bg-amber-500/10 border border-amber-500/20 text-amber-400' : 'hover:bg-slate-900 text-slate-400'}`}>
+                                <i data-lucide="trending-up" class="w-4 h-4"></i>
+                                Rincón de Tranquilidad
+                            </button>
+                            <button onClick={() => setCurrentTab('furniture')} class={`flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-bold uppercase tracking-wider transition shrink-0 ${currentTab === 'furniture' ? 'bg-pink-500/10 border border-pink-500/20 text-pink-400' : 'hover:bg-slate-900 text-slate-400'}`}>
+                                <i data-lucide="sofa" class="w-4 h-4"></i>
+                                Fondo Muebles
+                            </button>
+                            <button onClick={() => setCurrentTab('mortgage')} class={`flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-bold uppercase tracking-wider transition shrink-0 ${currentTab === 'mortgage' ? 'bg-purple-500/10 border border-purple-500/20 text-purple-400' : 'hover:bg-slate-900 text-slate-400'}`}>
+                                <i data-lucide="percent" class="w-4 h-4"></i>
+                                Plan de Hipoteca
+                            </button>
+                            <button onClick={() => setCurrentTab('config')} class={`flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-bold uppercase tracking-wider transition shrink-0 ${currentTab === 'config' ? 'bg-slate-800 border border-slate-700 text-slate-200' : 'hover:bg-slate-900 text-slate-500'}`}>
+                                <i data-lucide="settings" class="w-4 h-4"></i>
+                                Herramientas CSV
+                            </button>
+                        </div>
+
+                        {/* Contenido Dinámico (Derecha) */}
+                        <div class="lg:col-span-9 space-y-6">
+                            
+                            {/* PESTAÑA: MI CUENTA REVOLUT (DASHBOARD) */}
+                            {currentTab === 'dashboard' && (
+                                <div class="space-y-6 animate-fadeIn">
+                                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                        {/* Card 1: Líquido en Revolut */}
+                                        <div class="bg-gradient-to-br from-slate-900 to-slate-950 p-6 rounded-3xl border border-slate-800 shadow-xl relative overflow-hidden group">
+                                            <div class="absolute right-0 bottom-0 translate-x-4 translate-y-4 w-28 h-28 bg-cyan-500/5 rounded-full group-hover:scale-125 transition duration-500"></div>
+                                            <div class="flex items-center justify-between mb-3">
+                                                <span class="text-xs font-bold text-slate-400 uppercase tracking-widest">Saldo Real Revolut</span>
+                                                <div class="p-2 bg-cyan-500/10 text-cyan-400 rounded-xl"><i data-lucide="credit-card" class="w-4 h-4"></i></div>
+                                            </div>
+                                            <div class="text-3xl font-extrabold text-white">{processedData.saldoRevolutActual.toLocaleString('es-ES', { minimumFractionDigits: 2 })} €</div>
+                                            <p class="text-[11px] text-cyan-400 font-semibold mt-2 flex items-center gap-1">
+                                                <span class="w-1.5 h-1.5 rounded-full bg-cyan-400"></span>
+                                                Disponible en cuenta conjunta
+                                            </p>
+                                        </div>
+
+                                        {/* Card 2: Pendiente para firma */}
+                                        <div class="bg-gradient-to-br from-slate-900 to-slate-950 p-6 rounded-3xl border border-slate-800 shadow-xl relative overflow-hidden group">
+                                            <div class="absolute right-0 bottom-0 translate-x-4 translate-y-4 w-28 h-28 bg-amber-500/5 rounded-full group-hover:scale-125 transition duration-500"></div>
+                                            <div class="flex items-center justify-between mb-3">
+                                                <span class="text-xs font-bold text-slate-400 uppercase tracking-widest">Pendiente de Casa</span>
+                                                <div class="p-2 bg-amber-500/10 text-amber-400 rounded-xl"><i data-lucide="hourglass" class="w-4 h-4"></i></div>
+                                            </div>
+                                            <div class="text-3xl font-extrabold text-white">{(Math.max(0, metaTotal - processedData.totalAhorrado)).toLocaleString('es-ES', { minimumFractionDigits: 2 })} €</div>
+                                            <p class="text-[11px] text-slate-400 mt-2">Para cubrir gastos, entrada e IVA</p>
+                                        </div>
+
+                                        {/* Card 3: Fondo de Muebles actual */}
+                                        <div class="bg-gradient-to-br from-slate-900 to-slate-950 p-6 rounded-3xl border border-slate-800 shadow-xl relative overflow-hidden group">
+                                            <div class="absolute right-0 bottom-0 translate-x-4 translate-y-4 w-28 h-28 bg-pink-500/5 rounded-full group-hover:scale-125 transition duration-500"></div>
+                                            <div class="flex items-center justify-between mb-3">
+                                                <span class="text-xs font-bold text-slate-400 uppercase tracking-widest">Presupuesto Muebles</span>
+                                                <div class="p-2 bg-pink-500/10 text-pink-400 rounded-xl"><i data-lucide="shopping-bag" class="w-4 h-4"></i></div>
+                                            </div>
+                                            <div class="text-3xl font-extrabold text-white">{processedData.totalMueblesPresupuesto.toLocaleString('es-ES')} €</div>
+                                            <p class="text-[11px] text-pink-400 font-semibold mt-2">Gastado hasta ahora: {processedData.totalMueblesGastado.toLocaleString('es-ES')} €</p>
+                                        </div>
+                                    </div>
+
+                                    {/* SECCIÓN 50/50: EQUILIBRIO DE PAREJA */}
+                                    <div class="bg-slate-900/40 p-6 rounded-3xl border border-slate-800/80 space-y-6">
+                                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                            <div>
+                                                <h3 class="text-base font-extrabold text-white flex items-center gap-2">
+                                                    <i data-lucide="scale" class="w-5 h-5 text-indigo-400"></i>
+                                                    Acuerdo de Co-Inversión al 50/50
+                                                </h3>
+                                                <p class="text-xs text-slate-400">Control estricto para que vuestras aportaciones acumuladas estén siempre en armonía</p>
+                                            </div>
+
+                                            {/* Badge Dinámico de Compensación */}
+                                            {processedData.totalLaura === processedData.totalAsier ? (
+                                                <span class="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-bold px-3 py-1.5 rounded-full">Balance Perfecto</span>
+                                            ) : (
+                                                <span class="bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs font-bold px-3 py-1.5 rounded-full">
+                                                    Compensación Requerida
+                                                </span>
+                                            )}
+                                        </div>
+
+                                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                            {/* Bloque Laura */}
+                                            <div class="bg-slate-900/60 p-5 rounded-2xl border border-slate-800 relative">
+                                                <span class="absolute top-4 right-4 text-xs font-black text-pink-400 bg-pink-500/10 px-2 py-0.5 rounded-md">Laura</span>
+                                                <span class="text-xs font-bold text-slate-400">Total Aportado</span>
+                                                <div class="text-2xl font-black text-white mt-1">{processedData.totalLaura.toLocaleString('es-ES')} €</div>
+                                                <div class="mt-4 flex justify-between text-xs text-slate-400">
+                                                    <span>Cuota del total: {((processedData.totalLaura / (processedData.totalLaura + processedData.totalAsier || 1)) * 100).toFixed(1)}%</span>
+                                                </div>
+                                            </div>
+
+                                            {/* Bloque Asier */}
+                                            <div class="bg-slate-900/60 p-5 rounded-2xl border border-slate-800 relative">
+                                                <span class="absolute top-4 right-4 text-xs font-black text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded-md">Asier</span>
+                                                <span class="text-xs font-bold text-slate-400">Total Aportado</span>
+                                                <div class="text-2xl font-black text-white mt-1">{processedData.totalAsier.toLocaleString('es-ES')} €</div>
+                                                <div class="mt-4 flex justify-between text-xs text-slate-400">
+                                                    <span>Cuota del total: {((processedData.totalAsier / (processedData.totalLaura + processedData.totalAsier || 1)) * 100).toFixed(1)}%</span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Caja de Compensación Dinámica */}
+                                        {processedData.totalLaura !== processedData.totalAsier && (
+                                            <div class="bg-indigo-500/5 border border-indigo-500/15 p-4 rounded-2xl flex items-center gap-3.5 text-xs">
+                                                <div class="p-2 bg-indigo-500/10 text-indigo-400 rounded-lg shrink-0"><i data-lucide="arrow-right-left" class="w-4 h-4"></i></div>
+                                                <p class="text-slate-300 leading-relaxed">
+                                                    Para igualar la balanza al 50/50, <strong>{processedData.totalLaura < processedData.totalAsier ? 'Laura' : 'Asier'}</strong> debería ingresar un pago único de <strong class="text-indigo-400 font-extrabold">{(Math.abs(processedData.totalLaura - processedData.totalAsier) / 2).toLocaleString('es-ES', { minimumFractionDigits: 2 })} €</strong> en la cuenta de Revolut o realizar una transferencia compensatoria directa.
+                                                </p>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* PESTAÑA: CONTROL HISTÓRICO (SIMULATION AND EDITING) */}
+                            {currentTab === 'simulation' && (
+                                <div class="space-y-6 animate-fadeIn">
+                                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                        <div>
+                                            <h2 class="text-lg font-bold text-white">Historial de Aportaciones Conjuntas</h2>
+                                            <p class="text-xs text-slate-400 font-medium">Añade vuestras nóminas y depósitos mensuales directos. Reemplaza el Excel de forma permanente.</p>
+                                        </div>
+                                        <button onClick={addNewMonth} class="flex items-center gap-2 bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-extrabold px-4 py-2.5 rounded-xl transition shadow-lg shadow-cyan-500/20 shrink-0">
+                                            <i data-lucide="plus-circle" class="w-4 h-4"></i>
+                                            Registrar Nuevo Mes
+                                        </button>
+                                    </div>
+
+                                    {/* Formulario de Edición */}
+                                    {editingMonth && (
+                                        <div class="bg-slate-900 border border-cyan-500/30 rounded-3xl p-5 space-y-4 shadow-xl">
+                                            <h3 class="font-bold text-cyan-400 flex items-center gap-1.5 text-sm"><i data-lucide="edit-3" class="w-4 h-4"></i> Editar Mes Seleccionado</h3>
+                                            <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
+                                                <div>
+                                                    <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Nombre</label>
+                                                    <input type="text" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white text-xs font-bold" value={editForm.name} onChange={e => setEditForm({...editForm, name: e.target.value})} />
+                                                </div>
+                                                <div>
+                                                    <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Laura (€)</label>
+                                                    <input type="number" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white text-xs font-bold" value={editForm.laura} onChange={e => setEditForm({...editForm, laura: Number(e.target.value)})} />
+                                                </div>
+                                                <div>
+                                                    <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Asier (€)</label>
+                                                    <input type="number" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white text-xs font-bold" value={editForm.asier} onChange={e => setEditForm({...editForm, asier: Number(e.target.value)})} />
+                                                </div>
+                                                <div>
+                                                    <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Saldo Revolut (€)</label>
+                                                    <input type="number" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white text-xs font-bold" value={editForm.revolut} onChange={e => setEditForm({...editForm, revolut: Number(e.target.value)})} />
+                                                </div>
+                                                <div class="col-span-2 md:col-span-1">
+                                                    <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Plan Simulación (€)</label>
+                                                    <input type="number" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white text-xs font-bold" value={editForm.simulacion} onChange={e => setEditForm({...editForm, simulacion: Number(e.target.value)})} />
+                                                </div>
+                                            </div>
+                                            <div class="flex justify-end gap-2">
+                                                <button onClick={() => setEditingMonth(null)} class="bg-slate-800 hover:bg-slate-700 text-slate-400 text-xs px-4 py-2 rounded-xl font-bold transition">Cancelar</button>
+                                                <button onClick={saveEdit} class="bg-cyan-600 hover:bg-cyan-500 text-white text-xs px-4 py-2 rounded-xl font-bold transition">Confirmar Datos</button>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Tabla de registros */}
+                                    <div class="bg-slate-900/30 rounded-3xl border border-slate-800/80 overflow-hidden shadow-xl">
+                                        <div class="overflow-x-auto">
+                                            <table class="w-full border-collapse text-left text-xs">
+                                                <thead>
+                                                    <tr class="bg-slate-900 text-slate-400 font-extrabold border-b border-slate-800/80 uppercase tracking-widest text-[10px]">
+                                                        <th class="p-4">#</th>
+                                                        <th class="p-4">Mes</th>
+                                                        <th class="p-4 text-pink-400">Laura</th>
+                                                        <th class="p-4 text-blue-400">Asier</th>
+                                                        <th class="p-4">Total Ahorro</th>
+                                                        <th class="p-4 text-cyan-400">Saldo Revolut</th>
+                                                        <th class="p-4 text-indigo-400">Acumulado</th>
+                                                        <th class="p-4">Pendiente</th>
+                                                        <th class="p-4 text-right">Opciones</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody class="divide-y divide-slate-900">
+                                                    {processedData.rows.map((row, index) => (
+                                                        <tr key={row.id} class="hover:bg-slate-900/40 transition">
+                                                            <td class="p-4 text-slate-600 font-bold">{index + 1}</td>
+                                                            <td class="p-4 font-bold text-white">{row.name}</td>
+                                                            <td class="p-4 text-pink-400 font-bold">{row.laura.toLocaleString('es-ES')} €</td>
+                                                            <td class="p-4 text-blue-400 font-bold">{row.asier.toLocaleString('es-ES')} €</td>
+                                                            <td class="p-4 font-extrabold text-slate-300">{(row.totalMes).toLocaleString('es-ES')} €</td>
+                                                            <td class="p-4 text-cyan-400 font-extrabold">{row.revolut.toLocaleString('es-ES')} €</td>
+                                                            <td class="p-4 text-indigo-400 font-black">{row.acumulado.toLocaleString('es-ES')} €</td>
+                                                            <td class="p-4 text-amber-500 font-bold">{row.pendiente.toLocaleString('es-ES')} €</td>
+                                                            <td class="p-4">
+                                                                <div class="flex justify-end gap-1.5">
+                                                                    <button onClick={() => startEdit(row)} class="p-1.5 bg-slate-800/60 hover:bg-cyan-500/10 text-slate-400 hover:text-cyan-400 rounded-lg transition">
+                                                                        <i data-lucide="edit-2" class="w-3.5 h-3.5"></i>
+                                                                    </button>
+                                                                    <button onClick={() => deleteMonth(row.id)} class="p-1.5 bg-slate-800/60 hover:bg-rose-500/10 text-slate-400 hover:text-rose-400 rounded-lg transition">
+                                                                        <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                                                                    </button>
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* PESTAÑA: RINCÓN DE TRANQUILIDAD (PROYECTOR Y CONSEJOS) */}
+                            {currentTab === 'projections' && (
+                                <div class="space-y-6 animate-fadeIn">
+                                    <div class="bg-gradient-to-tr from-amber-600/10 via-amber-600/5 to-transparent p-6 rounded-3xl border border-amber-500/20">
+                                        <div class="flex items-center gap-3 mb-2">
+                                            <div class="p-2.5 bg-amber-500/15 text-amber-400 rounded-2xl"><i data-lucide="hourglass" class="w-6 h-6 animate-spin"></i></div>
+                                            <div>
+                                                <h2 class="text-lg font-black text-white">El Rincón de la Tranquilidad</h2>
+                                                <p class="text-xs text-slate-400">Tu planificador inteligente para estimar cuándo podréis firmar con plena paz mental</p>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Panel de control Deslizante (Slider) */}
+                                    <div class="bg-slate-900/60 p-6 rounded-3xl border border-slate-800 space-y-4">
+                                        <div class="flex justify-between items-center text-xs">
+                                            <span class="font-extrabold text-slate-400">Simulador de Ahorro Mensual Conjunto</span>
+                                            <span class="text-amber-400 font-black text-sm">{targetMonthlySaving.toLocaleString('es-ES')} €/mes</span>
+                                        </div>
+                                        <input 
+                                            type="range" 
+                                            min="1000" 
+                                            max="4500" 
+                                            step="100" 
+                                            value={targetMonthlySaving} 
+                                            onChange={e => setTargetMonthlySaving(Number(e.target.value))} 
+                                            class="w-full accent-amber-500 bg-slate-800 rounded-lg h-2"
+                                        />
+                                        <div class="flex justify-between text-[10px] text-slate-500 font-bold uppercase">
+                                            <span>Mínimo (1.000 €)</span>
+                                            <span>Velocidad Actual aprox: ({projections.actualMonthlyVelocity.toFixed(0)} €)</span>
+                                            <span>Máximo (4.500 €)</span>
+                                        </div>
+                                    </div>
+
+                                    {/* Tarjetas de Proyección de Tiempos */}
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        {/* Hito 1: Entrada y Gastos de la Casa */}
+                                        <div class="bg-slate-900/40 p-5 rounded-2xl border border-slate-800 space-y-3 relative overflow-hidden group">
+                                            <div class="absolute right-0 bottom-0 translate-x-4 translate-y-4 w-24 h-24 bg-cyan-500/5 rounded-full"></div>
+                                            <span class="text-[10px] uppercase font-black tracking-widest text-cyan-400 bg-cyan-500/10 px-2.5 py-1 rounded-md">1. Meta Casa</span>
+                                            <div class="text-slate-400 text-xs mt-2">Restan por ahorrar:</div>
+                                            <div class="text-xl font-extrabold text-white">{projections.restanteCasa.toLocaleString('es-ES', { minimumFractionDigits: 2 })} €</div>
+                                            <div class="text-xs text-slate-300 font-medium">Se conseguirá en: <strong class="text-cyan-400">{projections.mesesParaCasa} meses</strong></div>
+                                            <div class="text-sm font-black text-white bg-slate-900 p-2.5 rounded-xl border border-slate-800 text-center uppercase tracking-wider">
+                                                Fecha: {projections.fechaCasaLabel}
+                                            </div>
+                                        </div>
+
+                                        {/* Hito 2: Casa completa + Amueblado */}
+                                        <div class="bg-slate-900/40 p-5 rounded-2xl border border-slate-800 space-y-3 relative overflow-hidden group">
+                                            <div class="absolute right-0 bottom-0 translate-x-4 translate-y-4 w-24 h-24 bg-pink-500/5 rounded-full"></div>
+                                            <span class="text-[10px] uppercase font-black tracking-widest text-pink-400 bg-pink-500/10 px-2.5 py-1 rounded-md">2. Casa + Muebles Completos</span>
+                                            <div class="text-slate-400 text-xs mt-2">Restante total necesario:</div>
+                                            <div class="text-xl font-extrabold text-white">{projections.totalRestanteProyectoCompleto.toLocaleString('es-ES', { minimumFractionDigits: 2 })} €</div>
+                                            <div class="text-xs text-slate-300 font-medium">Se conseguirá en: <strong class="text-pink-400">{projections.mesesParaCompleto} meses</strong></div>
+                                            <div class="text-sm font-black text-white bg-slate-900 p-2.5 rounded-xl border border-slate-800 text-center uppercase tracking-wider">
+                                                Fecha: {projections.fechaCompletoLabel}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* DIAGNÓSTICO FINANCIERO Y CONSEJOS */}
+                                    <div class="bg-slate-900/30 p-6 rounded-3xl border border-slate-800 space-y-4">
+                                        <h3 class="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-1.5"><i data-lucide="sparkles" class="text-amber-400 w-4.5 h-4.5"></i> Informe del Consejero de la Casa</h3>
+                                        <div class="space-y-3 text-xs leading-relaxed text-slate-300">
+                                            <div class="p-3 bg-slate-900/60 rounded-xl border border-slate-800 flex items-start gap-2.5">
+                                                <div class="p-1 bg-emerald-500/10 text-emerald-400 rounded-md shrink-0"><i data-lucide="check" class="w-4 h-4"></i></div>
+                                                <p>
+                                                    <strong>Buen ritmo de fondo:</strong> Vuestra velocidad real promedio está en torno a los <strong class="text-emerald-400">{projections.actualMonthlyVelocity.toFixed(0)} € al mes</strong>. A este ritmo, el fondo para el pago final de la entrada estará cubierto holgadamente antes de que la constructora exija el desembolso final.
+                                                </p>
+                                            </div>
+                                            <div class="p-3 bg-slate-900/60 rounded-xl border border-slate-800 flex items-start gap-2.5">
+                                                <div class="p-1 bg-cyan-500/10 text-cyan-400 rounded-md shrink-0"><i data-lucide="alert-circle" class="w-4 h-4"></i></div>
+                                                <p>
+                                                    <strong>Recomendación para los muebles:</strong> Planificad la mudanza y compra de muebles para después de la firma. Al amueblar progresivamente utilizando el ritmo actual de ahorro, no tendréis que recurrir a financiación externa ni préstamos de consumo de tipo de interés elevado.
+                                                </p>
+                                            </div>
+                                            <div class="p-3 bg-slate-900/60 rounded-xl border border-slate-800 flex items-start gap-2.5">
+                                                <div class="p-1 bg-purple-500/10 text-purple-400 rounded-md shrink-0"><i data-lucide="info" class="w-4 h-4"></i></div>
+                                                <p>
+                                                    <strong>Consejo sobre la cuenta Revolut:</strong> Procurad mantener el capital que acumula intereses líquidos en una cuenta de ahorro remunerada de Revolut. Al ritmo actual, podríais obtener entre 200 y 400 € anuales limpios simplemente aprovechando el rendimiento pasivo.
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* PESTAÑA: FONDO MUEBLES (FURNITURE) */}
+                            {currentTab === 'furniture' && (
+                                <div class="space-y-6 animate-fadeIn">
+                                    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                        <div>
+                                            <h2 class="text-lg font-bold text-white">Planificador de Muebles y Equipamiento</h2>
+                                            <p class="text-xs text-slate-400">Presupuesta y controla lo que costará vestir la casa habitación por habitación</p>
+                                        </div>
+                                        <div class="text-xs bg-pink-500/10 border border-pink-500/20 text-pink-400 px-3 py-1.5 rounded-xl font-bold">
+                                            Total Restante: {(processedData.totalMueblesPresupuesto - processedData.totalMueblesGastado).toLocaleString('es-ES')} €
+                                        </div>
+                                    </div>
+
+                                    {/* Añadir nuevo mueble */}
+                                    <div class="bg-slate-900 border border-slate-800 rounded-3xl p-5 space-y-3.5">
+                                        <h3 class="font-bold text-white text-xs uppercase tracking-wider">Añadir Nueva Partida de Mueble</h3>
+                                        <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                                            <input 
+                                                type="text" 
+                                                placeholder="Habitación/Categoría (ej: Salón)" 
+                                                class="bg-slate-950 border border-slate-800 rounded-xl p-2 text-xs font-semibold text-white placeholder-slate-600"
+                                                value={newFurniture.category}
+                                                onChange={e => setNewFurniture({...newFurniture, category: e.target.value})}
+                                            />
+                                            <input 
+                                                type="text" 
+                                                placeholder="Elemento (ej: Sofá Cama)" 
+                                                class="bg-slate-950 border border-slate-800 rounded-xl p-2 text-xs font-semibold text-white placeholder-slate-600"
+                                                value={newFurniture.item}
+                                                onChange={e => setNewFurniture({...newFurniture, item: e.target.value})}
+                                            />
+                                            <input 
+                                                type="number" 
+                                                placeholder="Presupuesto Estimado (€)" 
+                                                class="bg-slate-950 border border-slate-800 rounded-xl p-2 text-xs font-semibold text-white placeholder-slate-600"
+                                                value={newFurniture.amount || ""}
+                                                onChange={e => setNewFurniture({...newFurniture, amount: Number(e.target.value)})}
+                                            />
+                                            <select 
+                                                class="bg-slate-950 border border-slate-800 rounded-xl p-2 text-xs font-semibold text-white"
+                                                value={newFurniture.priority}
+                                                onChange={e => setNewFurniture({...newFurniture, priority: e.target.value})}
+                                            >
+                                                <option value="Alta">Prioridad: Alta</option>
+                                                <option value="Media">Prioridad: Media</option>
+                                                <option value="Baja">Prioridad: Baja</option>
+                                            </select>
+                                        </div>
+                                        <button onClick={addFurnitureItem} class="w-full bg-pink-600 hover:bg-pink-500 text-white text-xs font-extrabold py-2 rounded-xl transition">
+                                            Registrar Partida de Gasto
+                                        </button>
+                                    </div>
+
+                                    {/* Listado de partidas presupuestarias */}
+                                    <div class="bg-slate-900/30 border border-slate-800 rounded-3xl overflow-hidden">
+                                        <div class="divide-y divide-slate-900">
+                                            {furnitureBudget.map((item) => (
+                                                <div key={item.id} class="p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 hover:bg-slate-900/40 transition">
+                                                    <div class="space-y-1">
+                                                        <div class="flex items-center gap-2">
+                                                            <span class="text-[10px] font-black uppercase bg-slate-800 px-2 py-0.5 rounded text-slate-400">{item.category}</span>
+                                                            <span class={`text-[10px] font-bold px-1.5 py-0.2 rounded ${
+                                                                item.priority === 'Alta' ? 'bg-rose-500/10 text-rose-400' :
+                                                                item.priority === 'Media' ? 'bg-amber-500/10 text-amber-400' :
+                                                                'bg-slate-800 text-slate-500'
+                                                            }`}>Prio: {item.priority}</span>
+                                                        </div>
+                                                        <h4 class="font-extrabold text-white text-xs">{item.item}</h4>
+                                                    </div>
+
+                                                    <div class="flex items-center gap-4 shrink-0">
+                                                        <div class="text-right">
+                                                            <div class="text-xs font-black text-white">{item.amount.toLocaleString('es-ES')} €</div>
+                                                            <span class="text-[10px] text-slate-500 font-bold uppercase">{item.status}</span>
+                                                        </div>
+
+                                                        <div class="flex gap-1.5">
+                                                            <button 
+                                                                onClick={() => toggleFurnitureStatus(item.id)} 
+                                                                class={`p-2 rounded-xl transition ${
+                                                                    item.status === 'Comprado' ? 'bg-emerald-500/15 text-emerald-400' : 'bg-slate-800 text-slate-400 hover:text-white'
+                                                                }`}
+                                                                title={item.status === 'Comprado' ? 'Marcar como Pendiente' : 'Marcar como Comprado'}
+                                                            >
+                                                                <i data-lucide={item.status === 'Comprado' ? 'check-square' : 'square'} class="w-4 h-4"></i>
+                                                            </button>
+                                                            <button onClick={() => deleteFurnitureItem(item.id)} class="p-2 bg-slate-850 hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 rounded-xl transition">
+                                                                <i data-lucide="trash" class="w-4 h-4"></i>
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* PESTAÑA: PLAN DE HIPOTECA (MORTGAGE) */}
+                            {currentTab === 'mortgage' && (
+                                <div class="space-y-6 animate-fadeIn">
+                                    <div class="bg-gradient-to-tr from-purple-600/10 via-purple-600/5 to-transparent p-6 rounded-3xl border border-purple-500/20">
+                                        <div class="flex items-center gap-3">
+                                            <div class="p-2.5 bg-purple-500/15 text-purple-400 rounded-2xl"><i data-lucide="landmark" class="w-6 h-6"></i></div>
+                                            <div>
+                                                <h2 class="text-lg font-black text-white">Simulador de Hipoteca & Viabilidad</h2>
+                                                <p class="text-xs text-slate-400">Analiza el impacto de la hipoteca de la casa en vuestra economía mensual</p>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Sliders de ajuste */}
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div class="bg-slate-900/60 p-5 rounded-2xl border border-slate-800 space-y-4">
+                                            <div class="flex justify-between items-center text-xs font-bold">
+                                                <span class="text-slate-400">Tipo de Interés Estimado (TIN)</span>
+                                                <span class="text-purple-400">{interestRate.toFixed(2)} %</span>
+                                            </div>
+                                            <input 
+                                                type="range" 
+                                                min="1.0" 
+                                                max="6.0" 
+                                                step="0.05" 
+                                                value={interestRate} 
+                                                onChange={e => setInterestRate(Number(e.target.value))} 
+                                                class="w-full accent-purple-500 bg-slate-800 rounded-lg h-2"
+                                            />
+                                        </div>
+
+                                        <div class="bg-slate-900/60 p-5 rounded-2xl border border-slate-800 space-y-4">
+                                            <div class="flex justify-between items-center text-xs font-bold">
+                                                <span class="text-slate-400">Plazo de Amortización</span>
+                                                <span class="text-purple-400">{loanTermYears} años</span>
+                                            </div>
+                                            <input 
+                                                type="range" 
+                                                min="10" 
+                                                max="35" 
+                                                step="1" 
+                                                value={loanTermYears} 
+                                                onChange={e => setLoanTermYears(Number(e.target.value))} 
+                                                class="w-full accent-purple-500 bg-slate-800 rounded-lg h-2"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* Resultados del Préstamo */}
+                                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                        <div class="bg-slate-900/40 p-5 rounded-2xl border border-slate-800">
+                                            <span class="text-[10px] text-slate-400 font-extrabold uppercase">Importe Financiado (80%)</span>
+                                            <div class="text-xl font-extrabold text-white mt-1">{hipotecaData.prestamoHipotecario.toLocaleString('es-ES')} €</div>
+                                            <p class="text-[10px] text-slate-500 mt-1">Precio total estimado: {hipotecaData.valorVivienda.toLocaleString('es-ES')} €</p>
+                                        </div>
+
+                                        <div class="bg-slate-900/40 p-5 rounded-2xl border border-slate-800">
+                                            <span class="text-[10px] text-slate-400 font-extrabold uppercase">Cuota Mensual Estimada</span>
+                                            <div class="text-2xl font-black text-purple-400 mt-1">{hipotecaData.cuotaMensual.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €</div>
+                                            <p class="text-[10px] text-slate-500 mt-1">Cuota dividida 50/50: {(hipotecaData.cuotaMensual / 2).toFixed(0)} € cada uno</p>
+                                        </div>
+
+                                        <div class="bg-slate-900/40 p-5 rounded-2xl border border-slate-800">
+                                            <span class="text-[10px] text-slate-400 font-extrabold uppercase">Total Intereses a Pagar</span>
+                                            <div class="text-xl font-extrabold text-white mt-1">{hipotecaData.totalIntereses.toLocaleString('es-ES', { minimumFractionDigits: 2 })} €</div>
+                                            <p class="text-[10px] text-slate-500 mt-1">Coste final del préstamo: {hipotecaData.totalPagado.toLocaleString('es-ES')} €</p>
+                                        </div>
+                                    </div>
+
+                                    {/* Consejos Viabilidad */}
+                                    <div class="bg-slate-900/30 p-5 rounded-3xl border border-slate-800 text-xs text-slate-300 space-y-3">
+                                        <h4 class="font-bold text-white uppercase tracking-wider">Regla del 30-35% de Endeudamiento</h4>
+                                        <p class="leading-relaxed">
+                                            Para que la hipoteca no ponga en aprietos vuestra economía, la cuota mensual ideal de <strong class="text-purple-400">{hipotecaData.cuotaMensual.toFixed(0)} €</strong> no debería superar el <strong class="text-white">30% de vuestros ingresos netos mensuales conjuntos</strong>.
+                                        </p>
+                                        <div class="p-3 bg-slate-950 rounded-xl border border-slate-900 flex justify-between font-bold">
+                                            <span>Ingresos mínimos recomendados (Neto total de pareja):</span>
+                                            <span class="text-purple-400">{(hipotecaData.cuotaMensual / 0.3).toLocaleString('es-ES', { maximumFractionDigits: 0 })} € / mes</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* PESTAÑA: CONFIGURACIÓN Y CSV IMPORT */}
+                            {currentTab === 'config' && (
+                                <div class="space-y-6 animate-fadeIn">
+                                    <div class="bg-slate-900/60 p-5 rounded-3xl border border-slate-800 space-y-4">
+                                        <h3 class="font-bold text-white text-sm flex items-center gap-1.5">
+                                            <i data-lucide="file-spreadsheet" class="w-4 h-4 text-emerald-400"></i>
+                                            Importar Respaldos CSV / Excel
+                                        </h3>
+                                        <p class="text-xs text-slate-400 leading-relaxed">
+                                            ¿Quieres restablecer o importar tu histórico de ahorro directamente desde un archivo? Sube vuestro archivo de simulación en formato CSV para actualizar de forma inmediata todas las aportaciones históricas de Laura y Asier.
+                                        </p>
+                                        <div class="flex items-center gap-3">
+                                            <input type="file" accept=".csv" onChange={handleCSVUpload} id="csvFileInput" class="hidden" />
+                                            <label htmlFor="csvFileInput" class="cursor-pointer bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition shadow-lg shadow-emerald-500/20">
+                                                Subir Archivo CSV
+                                            </label>
+                                        </div>
+                                    </div>
+
+                                    {/* Ajustes del límite total */}
+                                    <div class="bg-slate-900/60 p-5 rounded-3xl border border-slate-800 space-y-4">
+                                        <h3 class="font-bold text-white text-sm">Ajustar Objetivo General de Entrada</h3>
+                                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                            <div>
+                                                <label class="block text-xs font-semibold text-slate-400 mb-1">Meta del Proyecto de Entrada (€)</label>
+                                                <input type="number" id="metaTotalInput" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white text-xs font-bold" defaultValue={metaTotal} />
+                                            </div>
+                                            <div>
+                                                <label class="block text-xs font-semibold text-slate-400 mb-1">Saldo de Reserva Inicial (€)</label>
+                                                <input type="number" id="saldoInicialInput" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white text-xs font-bold" defaultValue={saldoInicial} />
+                                            </div>
+                                        </div>
+                                        <button onClick={() => {
+                                            const m = document.getElementById('metaTotalInput').value;
+                                            const s = document.getElementById('saldoInicialInput').value;
+                                            setMetaTotal(Number(m));
+                                            setSaldoInicial(Number(s));
+                                            persistData(contributions, Number(m), Number(s));
+                                            addNotification("Límites del plan actualizados");
+                                        }} class="bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-extrabold px-4 py-2.5 rounded-xl transition">
+                                            Actualizar Valores Globales
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+
+                        </div>
+                    </main>
+
+                    {/* PIE DE PÁGINA */}
+                    <footer class="bg-slate-900 border-t border-slate-800/80 py-5 text-center text-[10px] text-slate-500 mt-auto uppercase tracking-wider font-semibold">
+                        <p>© 2026 Panel de Control Financiero Familiar de Laura y Asier.</p>
+                    </footer>
+                </div>
+            );
+        }
+
+        // Renderizado inicial de la aplicación
+        const container = document.getElementById('root');
+        const root = ReactDOM.createRoot(container);
+        root.render(<App />);
+    </script>
+</body>
+</html>
