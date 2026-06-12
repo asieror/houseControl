@@ -113,7 +113,7 @@
             { id: "m17", name: "Julio (Año 2)", laura: 800, asier: 1500, revolut: 18801, simulacion: 1685 },
             { id: "m18", name: "Agosto (Año 2)", laura: 800, asier: 2000, revolut: 19940, simulacion: 1527 },
             { id: "m19", name: "Septiembre (Año 2)", laura: 800, asier: 1500, revolut: 20580, simulacion: 1450 },
-            { id: "m20", name: "Octubre (Año 2)", laura: 800, asier: 1500, revolut: 21219, simulacion: 1373 }
+            { id: "m20", name: "Octubre (Año 2)", laura: 800, asier: 1500, revolut: 10531.27, simulacion: 1373 } // Ajustado vuestro saldo base real de Revolut actual
         ];
 
         // --- LISTADO DE PRESUPUESTO DE MUEBLES ---
@@ -162,10 +162,11 @@
             const [houseMetas, setHouseMetas] = useState(DEFAULT_METAS);
             const [furnitureBudget, setFurnitureBudget] = useState(DEFAULT_FURNITURE_BUDGET);
             
-            // Corrector e Interés diario de Revolut (AUTOMATIZADO AL 1.15% ANUAL)
-            const [revolutCorrection, setRevolutCorrection] = useState(1324.50); 
-            const [revolutCorrectionReason, setRevolutCorrectionReason] = useState("Redondeos acumulados y céntimos extra de Revolut");
-            const [annualInterestRate, setAnnualInterestRate] = useState(1.15); // 1.15% Anual por defecto, pagado de forma diaria
+            // Corrector e Interés diario de Revolut (AUTOMATIZADO AL 1.15% ANUAL CON RETENCIÓN DEL 19%)
+            const [revolutCorrection, setRevolutCorrection] = useState(0.00); // Iniciado limpio gracias a vuestro nuevo saldo real corregido
+            const [revolutCorrectionReason, setRevolutCorrectionReason] = useState("Ajuste inicial de saldo real de Revolut");
+            const [annualInterestRate, setAnnualInterestRate] = useState(1.15); // 1.15% Anual
+            const [taxRatePercentage, setTaxRatePercentage] = useState(19.00); // 19% de retención del IRPF en España
             const [reconciliationDate, setReconciliationDate] = useState("2026-06-01"); 
             const [liveSeconds, setLiveSeconds] = useState(0); 
 
@@ -200,8 +201,8 @@
             const [firebaseError, setFirebaseError] = useState(null);
 
             // Estados temporales locales para evitar bloqueos de input al escribir (Typing block resolved)
-            const [tempCorrection, setTempCorrection] = useState("1324.50");
-            const [tempCorrectionReason, setTempCorrectionReason] = useState("Redondeos acumulados y céntimos extra de Revolut");
+            const [tempCorrection, setTempCorrection] = useState("0.00");
+            const [tempCorrectionReason, setTempCorrectionReason] = useState("Ajuste inicial de saldo real de Revolut");
             const [tempRepaidAmount, setTempRepaidAmount] = useState("0");
 
             // Sincronizar estados locales cuando cambia la base de datos de fondo
@@ -255,6 +256,7 @@
                 const localCorr = localStorage.getItem('casa_local_revolut_correction');
                 const localReason = localStorage.getItem('casa_local_revolut_reason');
                 const localIntRate = localStorage.getItem('casa_local_revolut_intrate');
+                const localTaxRate = localStorage.getItem('casa_local_revolut_taxrate');
                 const localRecDate = localStorage.getItem('casa_local_revolut_recdate');
                 const localEmails = localStorage.getItem('casa_local_allowed_emails');
                 const localPin = localStorage.getItem('casa_local_family_pin');
@@ -279,6 +281,7 @@
                     setTempCorrectionReason(localReason);
                 }
                 if (localIntRate) setAnnualInterestRate(parseFloat(localIntRate));
+                if (localTaxRate) setTaxRatePercentage(parseFloat(localTaxRate));
                 if (localRecDate) setReconciliationDate(localRecDate);
                 if (localEmails) setAllowedEmails(JSON.parse(localEmails));
                 if (localPin) setFamilyPin(localPin);
@@ -355,6 +358,7 @@
                                 setTempCorrectionReason(data.revolutCorrectionReason);
                             }
                             if (data.annualInterestRate !== undefined) setAnnualInterestRate(data.annualInterestRate);
+                            if (data.taxRatePercentage !== undefined) setTaxRatePercentage(data.taxRatePercentage);
                             if (data.reconciliationDate !== undefined) setReconciliationDate(data.reconciliationDate);
                             if (data.allowedEmails !== undefined) setAllowedEmails(data.allowedEmails);
                             if (data.familyPin !== undefined) setFamilyPin(data.familyPin);
@@ -396,7 +400,7 @@
                 }
             };
 
-            const persistData = async (updatedContribs, updatedMeta, updatedSaldo, updatedMetas, updatedFurniture, updatedCorr, updatedReason, updatedIntRate, updatedRecDate, updatedEmails, updatedPin, updatedLauraInit, updatedAsierInit, updatedRepaid) => {
+            const persistData = async (updatedContribs, updatedMeta, updatedSaldo, updatedMetas, updatedFurniture, updatedCorr, updatedReason, updatedIntRate, updatedRecDate, updatedEmails, updatedPin, updatedLauraInit, updatedAsierInit, updatedRepaid, updatedTaxRate) => {
                 const mTotal = updatedMeta !== undefined ? updatedMeta : metaTotal;
                 const sInicial = updatedSaldo !== undefined ? updatedSaldo : saldoInicial;
                 const listContribs = updatedContribs !== undefined ? updatedContribs : contributions;
@@ -406,6 +410,7 @@
                 const rCorr = updatedCorr !== undefined ? updatedCorr : revolutCorrection;
                 const rReason = updatedReason !== undefined ? updatedReason : revolutCorrectionReason;
                 const aIntRate = updatedIntRate !== undefined ? updatedIntRate : annualInterestRate;
+                const tRate = updatedTaxRate !== undefined ? updatedTaxRate : taxRatePercentage;
                 const rDate = updatedRecDate !== undefined ? updatedRecDate : reconciliationDate;
                 const aEmails = updatedEmails !== undefined ? updatedEmails : allowedEmails;
                 const fPin = updatedPin !== undefined ? updatedPin : familyPin;
@@ -426,6 +431,7 @@
                             revolutCorrection: rCorr,
                             revolutCorrectionReason: rReason,
                             annualInterestRate: aIntRate,
+                            taxRatePercentage: tRate,
                             reconciliationDate: rDate,
                             allowedEmails: aEmails,
                             familyPin: fPin,
@@ -458,6 +464,7 @@
                     localStorage.setItem('casa_local_revolut_correction', rCorr.toString());
                     localStorage.setItem('casa_local_revolut_reason', rReason);
                     localStorage.setItem('casa_local_revolut_intrate', aIntRate.toString());
+                    localStorage.setItem('casa_local_revolut_taxrate', tRate.toString());
                     localStorage.setItem('casa_local_revolut_recdate', rDate);
                     localStorage.setItem('casa_local_allowed_emails', JSON.stringify(aEmails));
                     localStorage.setItem('casa_local_family_pin', fPin);
@@ -547,7 +554,7 @@
                 }
                 try {
                     addNotification("Sincronizando datos con la Nube...", "info");
-                    await persistData(contributions, metaTotal, saldoInicial, houseMetas, furnitureBudget, revolutCorrection, revolutCorrectionReason, annualInterestRate, reconciliationDate, allowedEmails, familyPin, lauraInitialPayment, asierInitialPayment, repaidToLaura);
+                    await persistData(contributions, metaTotal, saldoInicial, houseMetas, furnitureBudget, revolutCorrection, revolutCorrectionReason, annualInterestRate, reconciliationDate, allowedEmails, familyPin, lauraInitialPayment, asierInitialPayment, repaidToLaura, taxRatePercentage);
                     addNotification("¡Todos tus datos han sido sincronizados y guardados en Firebase!", "success");
                 } catch (err) {
                     console.error("Error al inicializar base de datos:", err);
@@ -555,7 +562,7 @@
                 }
             };
 
-            // --- CÁLCULOS DINÁMICOS DE APORTACIONES E INTERESES ---
+            // --- CÁLCULOS DINÁMICOS DE APORTACIONES E INTERESES CON RETENCIÓN ---
             const processedData = useMemo(() => {
                 let currentAccumulated = saldoInicial;
                 let totalLaura = 0;
@@ -592,7 +599,7 @@
                 // Saldo base de la última conciliación
                 const lastMonthRevolutBase = contributions.length > 0 ? Number(contributions[contributions.length - 1].revolut) : saldoInicial;
 
-                // --- NUEVO SISTEMA DE INTERÉS DEL 1.15% COMPUESTO DIARIO AUTOMÁTICO ---
+                // --- NUEVO SISTEMA DE INTERÉS CON RETENCIÓN FISCAL DEL IRPF ---
                 const balanceAntesDeIntereses = lastMonthRevolutBase + revolutCorrection;
 
                 const lastDate = new Date(reconciliationDate || "2026-06-01");
@@ -602,20 +609,25 @@
                 
                 // Fórmula compuesta diaria basada en TIN anual: r_diario = (TIN / 100) / 365
                 const r_diario = (annualInterestRate / 100) / 365;
-                const accumulatedInterestRealTime = balanceAntesDeIntereses * (Math.pow(1 + r_diario, diffDays) - 1);
+                const accumulatedInterestGross = balanceAntesDeIntereses * (Math.pow(1 + r_diario, diffDays) - 1);
+                
+                // Aplicar el impuesto de retención (ej: 19% en España)
+                const taxFactor = taxRatePercentage / 100;
+                const accumulatedInterestRealTime = accumulatedInterestGross * (1 - taxFactor);
 
-                // Cuánto genera por día en este momento exacto
-                const interestPerDay = (balanceAntesDeIntereses + accumulatedInterestRealTime) * r_diario;
+                // Cuánto genera por día en este momento exacto (Neto e impuesto)
+                const interestPerDayGross = (balanceAntesDeIntereses + accumulatedInterestGross) * r_diario;
+                const interestPerDay = interestPerDayGross * (1 - taxFactor);
+                const taxWithheldPerDay = interestPerDayGross * taxFactor;
 
-                // Saldo Revolut final aplicando el interés compuesto acumulado en tiempo real y corrector manual
+                // Saldo Revolut final aplicando el interés neto compuesto acumulado en tiempo real y corrector manual
                 const saldoRevolutActual = balanceAntesDeIntereses + accumulatedInterestRealTime;
 
                 // Muebles
                 const totalMueblesPresupuesto = furnitureBudget.reduce((sum, item) => sum + item.amount, 0);
                 const totalMueblesGastado = furnitureBudget.reduce((sum, item) => sum + item.spent, 0);
 
-                // --- NUEVO CÁLCULO DE BALANCE DE COMPENSACIÓN GLOBAL ---
-                // Laura puso 33.000 € y Asier puso 10.000 € para la entrada del primer 10%.
+                // --- CÁLCULO DE BALANCE DE COMPENSACIÓN GLOBAL ---
                 const deudaInicialAsierALaura = (lauraInitialPayment - asierInitialPayment) / 2;
                 const deudaInicialPendiente = Math.max(0, deudaInicialAsierALaura - repaidToLaura);
 
@@ -632,9 +644,11 @@
                     totalLaura,
                     totalAsier,
                     lastMonthRevolutBase,
+                    accumulatedInterestGross,
                     accumulatedInterestRealTime,
                     diffDays,
                     interestPerDay,
+                    taxWithheldPerDay,
                     saldoRevolutActual,
                     totalSimulacion,
                     totalMueblesPresupuesto,
@@ -644,7 +658,7 @@
                     deudaMensualAsierALaura,
                     balanceConsolidadoAsierALaura
                 };
-            }, [contributions, metaTotal, saldoInicial, furnitureBudget, reconciliationDate, annualInterestRate, revolutCorrection, liveSeconds, lauraInitialPayment, asierInitialPayment, repaidToLaura]);
+            }, [contributions, metaTotal, saldoInicial, furnitureBudget, reconciliationDate, annualInterestRate, taxRatePercentage, revolutCorrection, liveSeconds, lauraInitialPayment, asierInitialPayment, repaidToLaura]);
 
             // --- PROYECCIONES DE TIEMPO Y CONSEJOS ---
             const projections = useMemo(() => {
@@ -779,7 +793,7 @@
                                     <h1 class="text-xl font-extrabold tracking-tight text-white flex items-center gap-2">
                                         Nuestra Casa <span class="text-[10px] uppercase font-black tracking-widest bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 px-2 py-0.5 rounded-md">Protected</span>
                                     </h1>
-                                    <p class="text-xs text-slate-400">Panel financiero inteligente de Laura & Asier</p>
+                                    <p class="text-xs text-slate-400">Panel financiero de Laura & Asier</p>
                                 </div>
                             </div>
 
@@ -885,7 +899,7 @@
                                             <div class="text-3xl font-extrabold text-white">{processedData.saldoRevolutActual.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €</div>
                                             <p class="text-[11px] text-cyan-400 font-semibold mt-2 flex items-center gap-1">
                                                 <span class="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping"></span>
-                                                Saldo actualizado con intereses diarios del {annualInterestRate}%
+                                                Saldo neto real (intereses compuestos aplicados)
                                             </p>
                                         </div>
 
@@ -912,21 +926,33 @@
                                         </div>
                                     </div>
 
-                                    {/* SECCIÓN INTERESES Y AJUSTE DE BALANCE PREMIUM (Saves automatically with button click - No block) */}
+                                    {/* SECCIÓN INTERESES Y AJUSTE DE BALANCE CON IMPUESTOS DETALLADOS */}
                                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        {/* Panel goteo intereses automatizados al 1.15% */}
+                                        {/* Panel goteo intereses con retención del 19% del IRPF */}
                                         <div class="bg-slate-900/60 p-5 rounded-3xl border border-slate-800 space-y-3 relative overflow-hidden group">
                                             <div class="absolute right-0 bottom-0 translate-x-4 translate-y-4 w-24 h-24 bg-emerald-500/5 rounded-full"></div>
                                             <div class="flex justify-between items-start">
-                                                <span class="text-[10px] uppercase font-black tracking-widest text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-md">Intereses Acumulados Automáticos ({annualInterestRate}% anual)</span>
+                                                <span class="text-[10px] uppercase font-black tracking-widest text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-md">Intereses Netos ({annualInterestRate}% TIN)</span>
                                                 <span class="text-[10px] text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded-md">
-                                                    +{processedData.interestPerDay.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €/día
+                                                    +{processedData.interestPerDay.toLocaleString('es-ES', { minimumFractionDigits: 4, maximumFractionDigits: 4 })} €/día (Neto)
                                                 </span>
                                             </div>
                                             <div class="text-2xl font-black text-white">{processedData.accumulatedInterestRealTime.toLocaleString('es-ES', { minimumFractionDigits: 5, maximumFractionDigits: 5 })} €</div>
-                                            <p class="text-[11px] text-slate-400 leading-relaxed">
-                                                Interés compuesto diario generado de forma pasiva sobre vuestro saldo base durante <strong class="text-white">{processedData.diffDays} días</strong> (desde el cuadre del {reconciliationDate}).
-                                            </p>
+                                            
+                                            <div class="text-[10px] text-slate-400 space-y-1">
+                                                <div class="flex justify-between">
+                                                    <span>Bruto generado en {processedData.diffDays} días:</span>
+                                                    <span class="font-semibold text-slate-300">+{processedData.accumulatedInterestGross.toLocaleString('es-ES', { minimumFractionDigits: 4 })} €</span>
+                                                </div>
+                                                <div class="flex justify-between text-rose-400/80">
+                                                    <span>Retención fiscal retenida ({taxRatePercentage}% IRPF):</span>
+                                                    <span>-{(processedData.accumulatedInterestGross * (taxRatePercentage/100)).toLocaleString('es-ES', { minimumFractionDigits: 4 })} €</span>
+                                                </div>
+                                                <div class="flex justify-between text-emerald-400 border-t border-slate-800/80 pt-1 mt-1 font-bold">
+                                                    <span>Interés Neto limpio acumulado:</span>
+                                                    <span>+{processedData.accumulatedInterestRealTime.toLocaleString('es-ES', { minimumFractionDigits: 4 })} €</span>
+                                                </div>
+                                            </div>
                                         </div>
 
                                         {/* Editor rápido de corrector para evitar bloqueos */}
@@ -1552,12 +1578,12 @@
                                     <div class="bg-slate-900 border border-slate-800 rounded-3xl p-5 space-y-4 shadow-xl">
                                         <h3 class="font-bold text-white text-sm flex items-center gap-1.5">
                                             <span class="text-emerald-400">{SVGIcons.wallet}</span>
-                                            Ajustes de Interés del 1.15% Anual de Revolut
+                                            Ajustes de Interés de Revolut & Retenciones Fiscales
                                         </h3>
                                         <p class="text-xs text-slate-400 leading-relaxed">
-                                            Define la tasa de interés anual de vuestra cuenta y la fecha de vuestro último cuadre oficial de saldo de Revolut:
+                                            Define la tasa de interés anual, la retención fiscal obligatoria y la fecha de vuestro último cuadre oficial de saldo de Revolut:
                                         </p>
-                                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
                                             <div>
                                                 <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Tasa de Interés Anual (TIN %)</label>
                                                 <input 
@@ -1569,6 +1595,20 @@
                                                         const val = Number(e.target.value);
                                                         setAnnualInterestRate(val);
                                                         persistData(contributions, metaTotal, saldoInicial, houseMetas, furnitureBudget, revolutCorrection, revolutCorrectionReason, val);
+                                                    }}
+                                                />
+                                            </div>
+                                            <div>
+                                                <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Retención Fiscal (IRPF %)</label>
+                                                <input 
+                                                    type="number" 
+                                                    step="0.5"
+                                                    class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs font-bold text-white focus:outline-none focus:border-emerald-500" 
+                                                    value={taxRatePercentage}
+                                                    onChange={e => {
+                                                        const val = Number(e.target.value);
+                                                        setTaxRatePercentage(val);
+                                                        persistData(contributions, metaTotal, saldoInicial, houseMetas, furnitureBudget, revolutCorrection, revolutCorrectionReason, annualInterestRate, reconciliationDate, allowedEmails, familyPin, lauraInitialPayment, asierInitialPayment, repaidToLaura, val);
                                                     }}
                                                 />
                                             </div>
@@ -1587,7 +1627,7 @@
                                         </div>
                                         
                                         <div class="bg-slate-950 p-4 rounded-xl border border-slate-900 text-xs text-slate-400 space-y-2">
-                                            <p class="font-bold text-white">¿Cómo funciona la automatización?</p>
+                                            <p class="font-bold text-white">¿Cómo funciona la automatización con impuestos?</p>
                                             <p>El sistema calcula cuántos días han pasado desde la fecha de vuestro último cuadre hasta el día de hoy, y le aplica un interés compuesto diario del <strong>{(annualInterestRate/365).toFixed(5)}% al día</strong> de forma transparente sobre vuestro capital. De esta forma, el saldo que veis en la app estará siempre en perfecta armonía con vuestra cuenta real de Revolut sin tocar nada.</p>
                                         </div>
                                     </div>
