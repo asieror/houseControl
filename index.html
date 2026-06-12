@@ -204,6 +204,9 @@
             const [tempCorrection, setTempCorrection] = useState("0.00");
             const [tempCorrectionReason, setTempCorrectionReason] = useState("Ajuste inicial de saldo real de Revolut");
             const [tempRepaidAmount, setTempRepaidAmount] = useState("0");
+            
+            // --- RESTAURADO: ESTADO PARA NUEVAS PARTIDAS DE MUEBLES ---
+            const [newFurniture, setNewFurniture] = useState({ category: "", item: "", amount: 0, priority: "Media" });
 
             // Sincronizar estados locales cuando cambia la base de datos de fondo
             useEffect(() => {
@@ -723,65 +726,185 @@
                 };
             }, [interestRate, loanTermYears]);
 
-            // --- VISTA DE LOGIN ---
-            if (!isAuthenticated) {
-                return (
-                    <div class="min-h-screen flex items-center justify-center bg-slate-950 px-4 md:p-6">
-                        <div class="bg-slate-900 border border-slate-800 p-8 rounded-3xl max-w-md w-full shadow-2xl space-y-6 text-center animate-fadeIn">
-                            <div class="flex flex-col items-center gap-2">
-                                <div class="p-3.5 bg-gradient-to-tr from-cyan-600 to-indigo-500 rounded-2xl shadow-xl shadow-cyan-500/20 text-white">
-                                    {SVGIcons.lock}
-                                </div>
-                                <h1 class="text-2xl font-black text-white tracking-tight">Acceso Privado</h1>
-                                <p class="text-xs text-slate-400">Control de la Entrada & Gastos del Piso</p>
-                            </div>
+            // --- GESTIÓN DE EDICIONES DE MESES ---
+            const [editingMonth, setEditingMonth] = useState(null);
+            const [editForm, setEditForm] = useState({ name: "", laura: 0, asier: 0, revolut: 0, simulacion: 0 });
 
-                            {loginError && (
-                                <div class="bg-rose-500/10 border border-rose-500/25 p-3 rounded-xl text-xs text-rose-300 font-semibold text-left leading-relaxed">
-                                    {loginError}
-                                </div>
-                            )}
+            const startEdit = (month) => {
+                setEditingMonth(month.id);
+                setEditForm({
+                    name: month.name,
+                    laura: month.laura,
+                    asier: month.asier,
+                    revolut: month.revolut,
+                    simulacion: month.simulacion
+                });
+            };
 
-                            {/* Opción 1: Acceso por Google */}
-                            <button 
-                                onClick={loginWithGoogle}
-                                class="w-full bg-slate-950 hover:bg-slate-850 text-white border border-slate-800 text-xs font-bold py-3.5 px-4 rounded-xl transition flex items-center justify-center gap-2.5 shadow-md"
-                            >
-                                {SVGIcons.google}
-                                Iniciar sesión con Google
-                            </button>
+            const saveEdit = () => {
+                const updated = contributions.map(c => {
+                    if (c.id === editingMonth) {
+                        return {
+                            ...c,
+                            name: editForm.name,
+                            laura: Number(editForm.laura),
+                            asier: Number(editForm.asier),
+                            revolut: Number(editForm.revolut),
+                            simulacion: Number(editForm.simulacion)
+                        };
+                    }
+                    return c;
+                });
+                setContributions(updated);
+                setEditingMonth(null);
+                persistData(updated);
+                addNotification("Aportación mensual guardada");
+            };
 
-                            <div class="relative flex py-2 items-center">
-                                <div class="flex-grow border-t border-slate-800"></div>
-                                <span class="flex-shrink mx-4 text-slate-500 text-[10px] font-black uppercase tracking-wider">o introduce vuestro PIN</span>
-                                <div class="flex-grow border-t border-slate-800"></div>
-                            </div>
+            const addNewMonth = () => {
+                const nextNum = contributions.length + 1;
+                const lastMonth = contributions[contributions.length - 1];
+                const newMonth = {
+                    id: 'm_' + Date.now(),
+                    name: `Mes ${nextNum}`,
+                    laura: lastMonth ? lastMonth.laura : 800,
+                    asier: lastMonth ? lastMonth.asier : 1500,
+                    revolut: lastMonth ? lastMonth.revolut + (lastMonth.laura + lastMonth.asier) : saldoInicial + 2300,
+                    simulacion: lastMonth ? lastMonth.simulacion : 1373
+                };
+                const updated = [...contributions, newMonth];
+                setContributions(updated);
+                persistData(updated);
+                addNotification("Fila de planificación mensual añadida");
+            };
 
-                            {/* Opción 2: Acceso rápido por PIN */}
-                            <form onSubmit={handlePinLogin} class="space-y-3">
-                                <input 
-                                    type="password" 
-                                    maxLength="10"
-                                    placeholder="Introduce el PIN de pareja..."
-                                    class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-center text-sm font-bold text-white tracking-widest placeholder-slate-600 focus:outline-none focus:border-cyan-500"
-                                    value={loginPinInput}
-                                    onChange={e => setLoginPinInput(e.target.value)}
-                                />
-                                <button type="submit" class="w-full bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-black py-3 rounded-xl transition shadow-lg shadow-cyan-500/20">
-                                    Validar PIN de Acceso
-                                </button>
-                            </form>
+            const deleteMonth = (id) => {
+                if (window.confirm("¿Estás seguro de que quieres eliminar este mes del historial?")) {
+                    const updated = contributions.filter(c => c.id !== id);
+                    setContributions(updated);
+                    persistData(updated);
+                    addNotification("Mes eliminado del histórico", "info");
+                }
+            };
 
-                            <p class="text-[10px] text-slate-500 font-medium">
-                                Esta aplicación está configurada para restringir accesos no autorizados al plan familiar.
-                            </p>
-                        </div>
-                    </div>
-                );
-            }
+            // --- GESTIÓN DE PARTIDAS DE MUEBLES ---
+            const addFurnitureItem = () => {
+                if (!newFurniture.category || !newFurniture.item || !newFurniture.amount) {
+                    addNotification("Completa todos los campos para añadir el mueble", "error");
+                    return;
+                }
+                const newItem = {
+                    id: 'f_' + Date.now(),
+                    category: newFurniture.category,
+                    item: newFurniture.item,
+                    amount: Number(newFurniture.amount),
+                    spent: 0,
+                    status: 'Pendiente',
+                    priority: newFurniture.priority
+                };
+                const updated = [...furnitureBudget, newItem];
+                setFurnitureBudget(updated);
+                persistData(contributions, metaTotal, saldoInicial, houseMetas, updated);
+                setNewFurniture({ category: "", item: "", amount: 0, priority: "Media" });
+                addNotification("Partida de mueble añadida con éxito");
+            };
+
+            const deleteFurnitureItem = (id) => {
+                const updated = furnitureBudget.filter(f => f.id !== id);
+                setFurnitureBudget(updated);
+                persistData(contributions, metaTotal, saldoInicial, houseMetas, updated);
+                addNotification("Partida presupuestaria eliminada");
+            };
+
+            const toggleFurnitureStatus = (id) => {
+                const updated = furnitureBudget.map(f => {
+                    if (f.id === id) {
+                        const newStatus = f.status === 'Comprado' ? 'Pendiente' : 'Comprado';
+                        return {
+                            ...f,
+                            status: newStatus,
+                            spent: newStatus === 'Comprado' ? f.amount : 0
+                        };
+                    }
+                    return f;
+                });
+                setFurnitureBudget(updated);
+                persistData(contributions, metaTotal, saldoInicial, houseMetas, updated);
+                addNotification("Estado de compra actualizado");
+            };
+
+            // --- CSV IMPORT UTILITIES ---
+            const handleCSVUpload = (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    parseCSVData(event.target.result);
+                };
+                reader.readAsText(file);
+            };
+
+            const parseCSVData = (text) => {
+                try {
+                    const lines = text.split('\n');
+                    let parsedMeta = DEFAULT_META_TOTAL;
+                    let parsedSaldo = DEFAULT_SALDO_INICIAL;
+                    let parsedMetas = [...DEFAULT_METAS];
+                    const parsedMonthly = [];
+
+                    lines.forEach(line => {
+                        const cols = line.split(',');
+                        if (cols.length < 2) return;
+
+                        const cleanText = (str) => str ? str.trim().replace(/"/g, '') : '';
+                        const cleanNum = (str) => {
+                            if (!str) return 0;
+                            let val = str.trim().replace(/"/g, '').replace('€', '').replace(/\s/g, '');
+                            if (val.includes('.') && val.includes(',')) {
+                                val = val.replace(/\./g, '').replace(',', '.');
+                            } else if (val.includes(',')) {
+                                val = val.replace(',', '.');
+                            }
+                            return parseFloat(val) || 0;
+                        };
+
+                        const label = cleanText(cols[1]);
+                        const val = cols[2];
+
+                        if (label.includes("10% Entrada Piso")) parsedMetas[0].amount = cleanNum(val);
+                        else if (label.includes("IVA (Gastos)")) parsedMetas[1].amount = cleanNum(val);
+                        else if (label.includes("Personalización")) parsedMetas[2].amount = cleanNum(val);
+                        else if (label.includes("META TOTAL")) parsedMeta = cleanNum(val);
+                        else if (label.includes("Saldo Inicial Real")) parsedSaldo = cleanNum(val);
+
+                        const idx = parseInt(cols[0]);
+                        if (!isNaN(idx) && idx > 0 && cols.length >= 6) {
+                            parsedMonthly.push({
+                                id: 'm_imported_' + idx + '_' + Date.now(),
+                                name: cleanText(cols[1]),
+                                laura: cleanNum(cols[2]),
+                                asier: cleanNum(cols[3]),
+                                revolut: cleanNum(cols[5]),
+                                simulacion: cleanNum(cols[11]) || cleanNum(cols[4])
+                            });
+                        }
+                    });
+
+                    if (parsedMonthly.length > 0) {
+                        setMetaTotal(parsedMeta);
+                        setSaldoInicial(parsedSaldo);
+                        setHouseMetas(parsedMetas);
+                        setContributions(parsedMonthly);
+                        persistData(parsedMonthly, parsedMeta, parsedSaldo, parsedMetas);
+                        addNotification("Importación de CSV completada", "success");
+                    }
+                } catch (err) {
+                    addNotification("Error procesando CSV", "error");
+                }
+            };
 
             return (
-                <div class="flex-1 flex flex-col min-h-screen animate-fadeIn">
+                <div class="flex-1 flex flex-col min-h-screen">
                     {/* ENCABEZADO PRÉMIUM */}
                     <header class="bg-slate-900 border-b border-slate-800 py-4 px-6 sticky top-0 z-40 shadow-xl">
                         <div class="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
