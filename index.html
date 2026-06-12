@@ -54,14 +54,17 @@
             animation: fadeIn 0.4s ease-out forwards;
         }
     </style>
-    <!-- Chart.js -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
     <!-- React & Babel CDNs -->
     <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <!-- Lucide Icons -->
-    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <!-- Firebase Compat SDKs (Máxima estabilidad para apps monofichero sin importar dinámicos) -->
+    <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore-compat.js"></script>
+
     <!-- MathJax for Elegant LaTeX rendering -->
     <script type="text/javascript" id="MathJax-script" async
       src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js">
@@ -106,7 +109,7 @@
             { id: "m20", name: "Octubre (Año 2)", laura: 800, asier: 1500, revolut: 21219, simulacion: 1373 }
         ];
 
-        // --- LISTADO DE PRESUPUESTO DE MUEBLES (ACTUALIZADO CON TUS DATOS REALES) ---
+        // --- LISTADO DE PRESUPUESTO DE MUEBLES ---
         const DEFAULT_FURNITURE_BUDGET = [
             { id: 'f1', category: 'Cocina & Electrodomésticos', item: 'Frigorífico, horno, inducción y lavavajillas (PAGADO COMPLETO)', amount: 4500, spent: 4500, status: 'Comprado', priority: 'Alta' },
             { id: 'f2', category: 'Salón / Sala', item: 'Sofá chaise longue cómodo, mueble de TV y mesa de comedor', amount: 3300, spent: 0, status: 'Pendiente', priority: 'Alta' },
@@ -118,7 +121,7 @@
             { id: 'f8', category: 'Mudanza & Detalles', item: 'Cajas de embalar, transporte profesional e imprevistos', amount: 800, spent: 0, status: 'Pendiente', priority: 'Media' }
         ];
 
-        // --- CREDENCIALES COMPARTIDAS POR EL USUARIO ---
+        // --- CREDENCIALES DEL PROYECTO DEL USUARIO ---
         const DEFAULT_FIREBASE_CREDENTIALS = {
             apiKey: "AIzaSyCLPhH1UmIrrv4K9CBnDzW47Kigt91FU8g",
             authDomain: "housecontrol-2bace.firebaseapp.com",
@@ -126,6 +129,19 @@
             storageBucket: "housecontrol-2bace.firebasestorage.app",
             messagingSenderId: "655569001492",
             appId: "1:655569001492:web:968b5c5fe7f418927e5b01"
+        };
+
+        // --- ICONOS VECTORIALES SVG PARA PREVENIR ERRORES DE CARGA ---
+        const SVGIcons = {
+            home: <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor" class="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25" /></svg>,
+            wallet: <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor" class="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M21 12a2.25 2.25 0 00-2.25-2.25H15a3 3 0 11-6 0H5.25A2.25 2.25 0 003 12m18 0v6a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 18v-6m18 0V9M3 12V9m18-3a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 003 6v3h18V6z" /></svg>,
+            hourglass: <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor" class="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
+            scale: <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor" class="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M12 3v18m0-18L7.5 7.5M12 3l4.5 4.5M21 12H3" /></svg>,
+            plus: <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor" class="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>,
+            trash: <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor" class="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" /></svg>,
+            edit: <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor" class="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" /></svg>,
+            save: <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor" class="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
+            settings: <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor" class="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.43l-1.003.828c-.293.241-.438.613-.43.992a7.723 7.723 0 010 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.43l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.991l-1.004-.827a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.28z" /><circle cx="12" cy="12" r="3" strokeLinecap="round" strokeLinejoin="round" /></svg>
         };
 
         function App() {
@@ -163,7 +179,6 @@
             };
 
             const dbRef = useRef(null);
-            const authRef = useRef(null);
             const syncUnsubscribe = useRef(null);
 
             // Cargar datos locales o conectar a Firebase automáticamente al inicio
@@ -172,21 +187,25 @@
                     setFirebaseConfigForm(firebaseConfig);
                     connectFirebase(firebaseConfig);
                 } else {
-                    const localData = localStorage.getItem('casa_local_contributions');
-                    const localMeta = localStorage.getItem('casa_local_meta');
-                    const localSaldo = localStorage.getItem('casa_local_saldo');
-                    const localMetas = localStorage.getItem('casa_local_metas');
-                    const localFurniture = localStorage.getItem('casa_local_furniture');
-                    if (localData) setContributions(JSON.parse(localData));
-                    if (localMeta) setMetaTotal(parseFloat(localMeta));
-                    if (localSaldo) setSaldoInicial(parseFloat(localSaldo));
-                    if (localMetas) setHouseMetas(JSON.parse(localMetas));
-                    if (localFurniture) setFurnitureBudget(JSON.parse(localFurniture));
+                    loadLocalStorageData();
                 }
                 return () => {
                     if (syncUnsubscribe.current) syncUnsubscribe.current();
                 };
             }, []);
+
+            const loadLocalStorageData = () => {
+                const localData = localStorage.getItem('casa_local_contributions');
+                const localMeta = localStorage.getItem('casa_local_meta');
+                const localSaldo = localStorage.getItem('casa_local_saldo');
+                const localMetas = localStorage.getItem('casa_local_metas');
+                const localFurniture = localStorage.getItem('casa_local_furniture');
+                if (localData) setContributions(JSON.parse(localData));
+                if (localMeta) setMetaTotal(parseFloat(localMeta));
+                if (localSaldo) setSaldoInicial(parseFloat(localSaldo));
+                if (localMetas) setHouseMetas(JSON.parse(localMetas));
+                if (localFurniture) setFurnitureBudget(JSON.parse(localFurniture));
+            };
 
             // Disparar renderizado de LaTeX cada vez que cambiamos de pestaña o de datos
             useEffect(() => {
@@ -195,23 +214,29 @@
                 }
             }, [currentTab, interestRate, loanTermYears, targetMonthlySaving]);
 
-            // Conexión a Firebase cumpliendo estrictamente con las Reglas 1, 2 y 3
+            // Conexión a Firebase utilizando el SDK compatible para evitar fallos de compilación dinámicos
             const connectFirebase = async (config) => {
                 setFirebaseStatus('connecting');
                 try {
-                    const { initializeApp } = await import('https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js');
-                    const { getAuth, signInAnonymously, onAuthStateChanged } = await import('https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js');
-                    const { getFirestore, doc, getDoc, setDoc, collection, onSnapshot } = await import('https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js');
+                    // Verificar que las librerías globales de Firebase están listas
+                    if (typeof firebase === 'undefined') {
+                        throw new Error('Librerías de Firebase no cargadas aún');
+                    }
 
-                    const app = initializeApp(config);
-                    const auth = getAuth(app);
-                    const db = getFirestore(app);
+                    // Evitar duplicidades de inicialización
+                    let app;
+                    if (!firebase.apps.length) {
+                        app = firebase.initializeApp(config);
+                    } else {
+                        app = firebase.app();
+                    }
 
-                    authRef.current = auth;
+                    const auth = firebase.auth();
+                    const db = firebase.firestore();
                     dbRef.current = db;
 
-                    // REGLA 3: Autenticación anónima inmediata antes de realizar cualquier operación
-                    const userCredential = await signInAnonymously(auth);
+                    // REGLA 3: Autenticación anónima inmediata
+                    const userCredential = await auth.signInAnonymously();
                     const user = userCredential.user;
 
                     if (user) {
@@ -220,12 +245,12 @@
                         
                         // REGLA 1: Usar rutas de almacenamiento estrictas
                         const appIdSlug = config.projectId || 'housecontrol-2bace';
-                        const pathConfig = doc(db, 'artifacts', appIdSlug, 'public', 'data', 'config', 'meta_config');
+                        const pathConfig = db.collection('artifacts').doc(appIdSlug).collection('public').doc('data').collection('config').doc('meta_config');
                         
                         // Escuchar configuraciones de la meta de ahorro
-                        onSnapshot(pathConfig, (docSnap) => {
-                            if (!auth.currentUser) return; // Guard de Autenticación
-                            if (docSnap.exists()) {
+                        pathConfig.onSnapshot((docSnap) => {
+                            if (!auth.currentUser) return; // Guard de autenticación
+                            if (docSnap.exists) {
                                 const data = docSnap.data();
                                 if (data.metaTotal) setMetaTotal(data.metaTotal);
                                 if (data.saldoInicial) setSaldoInicial(data.saldoInicial);
@@ -233,15 +258,15 @@
                                 if (data.furnitureBudget) setFurnitureBudget(data.furnitureBudget);
                             }
                         }, (error) => {
-                            console.warn("Permisos restringidos. Creando datos de inicialización...");
+                            console.warn("Fallo al leer config de Firestore, usando locales");
                         });
 
                         // REGLA 2: Consultar la colección completa sin filtros complejos
-                        const contribCollection = collection(db, 'artifacts', appIdSlug, 'public', 'data', 'contributions');
+                        const contribCollection = db.collection('artifacts').doc(appIdSlug).collection('public').doc('data').collection('contributions');
                         if (syncUnsubscribe.current) syncUnsubscribe.current();
                         
-                        syncUnsubscribe.current = onSnapshot(contribCollection, (querySnap) => {
-                            if (!auth.currentUser) return; // Guard de Autenticación
+                        syncUnsubscribe.current = contribCollection.onSnapshot((querySnap) => {
+                            if (!auth.currentUser) return; // Guard de autenticación
                             const list = [];
                             querySnap.forEach((doc) => {
                                 list.push({ id: doc.id, ...doc.data() });
@@ -252,12 +277,13 @@
                                 setContributions(list);
                             }
                         }, (err) => {
-                            console.error("Error al suscribirse a las aportaciones de Firestore:", err);
+                            console.error("Error en Snapshot de contribuciones:", err);
                         });
                     }
                 } catch (error) {
                     console.error("Error al inicializar Firebase SDK:", error);
                     setFirebaseStatus('error');
+                    loadLocalStorageData();
                     addNotification("Error conectando a Firebase, utilizando almacenamiento local seguro", "error");
                 }
             };
@@ -271,11 +297,10 @@
 
                 if (firebaseStatus === 'connected' && dbRef.current) {
                     try {
-                        const { doc, setDoc } = await import('https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js');
                         const appIdSlug = firebaseConfig.projectId || 'housecontrol-2bace';
                         
                         // Guardar configuración y muebles
-                        await setDoc(doc(dbRef.current, 'artifacts', appIdSlug, 'public', 'data', 'config', 'meta_config'), {
+                        await dbRef.current.collection('artifacts').doc(appIdSlug).collection('public').doc('data').collection('config').doc('meta_config').set({
                             metaTotal: mTotal,
                             saldoInicial: sInicial,
                             houseMetas: hMetas,
@@ -285,7 +310,7 @@
                         // Guardar aportaciones mensuales históricas
                         for (let i = 0; i < listContribs.length; i++) {
                             const month = listContribs[i];
-                            await setDoc(doc(dbRef.current, 'artifacts', appIdSlug, 'public', 'data', 'contributions', month.id), {
+                            await dbRef.current.collection('artifacts').doc(appIdSlug).collection('public').doc('data').collection('contributions').doc(month.id).set({
                                 name: month.name,
                                 laura: Number(month.laura),
                                 asier: Number(month.asier),
@@ -396,12 +421,10 @@
             }, [processedData, targetMonthlySaving, metaTotal, contributions]);
 
             // --- SIMULADOR HIPOTECA ---
-            // Precio de la vivienda asumido en base al 10% de entrada (€34.870) lo que equivale a €348.700
             const hipotecaData = useMemo(() => {
                 const valorVivienda = 348700;
-                const prestamoHipotecario = valorVivienda * 0.8; // Financiación estándar al 80%
+                const prestamoHipotecario = valorVivienda * 0.8; 
                 
-                // Tipo de interés mensual r y número de cuotas n
                 const r = (interestRate / 100) / 12;
                 const n = loanTermYears * 12;
                 
@@ -547,6 +570,76 @@
                 addNotification("Restaurado a credenciales por defecto", "info");
             };
 
+            // --- CSV IMPORT UTILITIES ---
+            const handleCSVUpload = (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    parseCSVData(event.target.result);
+                };
+                reader.readAsText(file);
+            };
+
+            const parseCSVData = (text) => {
+                try {
+                    const lines = text.split('\n');
+                    let parsedMeta = DEFAULT_META_TOTAL;
+                    let parsedSaldo = DEFAULT_SALDO_INICIAL;
+                    let parsedMetas = [...DEFAULT_METAS];
+                    const parsedMonthly = [];
+
+                    lines.forEach(line => {
+                        const cols = line.split(',');
+                        if (cols.length < 2) return;
+
+                        const cleanText = (str) => str ? str.trim().replace(/"/g, '') : '';
+                        const cleanNum = (str) => {
+                            if (!str) return 0;
+                            let val = str.trim().replace(/"/g, '').replace('€', '').replace(/\s/g, '');
+                            if (val.includes('.') && val.includes(',')) {
+                                val = val.replace(/\./g, '').replace(',', '.');
+                            } else if (val.includes(',')) {
+                                val = val.replace(',', '.');
+                            }
+                            return parseFloat(val) || 0;
+                        };
+
+                        const label = cleanText(cols[1]);
+                        const val = cols[2];
+
+                        if (label.includes("10% Entrada Piso")) parsedMetas[0].amount = cleanNum(val);
+                        else if (label.includes("IVA (Gastos)")) parsedMetas[1].amount = cleanNum(val);
+                        else if (label.includes("Personalización")) parsedMetas[2].amount = cleanNum(val);
+                        else if (label.includes("META TOTAL")) parsedMeta = cleanNum(val);
+                        else if (label.includes("Saldo Inicial Real")) parsedSaldo = cleanNum(val);
+
+                        const idx = parseInt(cols[0]);
+                        if (!isNaN(idx) && idx > 0 && cols.length >= 6) {
+                            parsedMonthly.push({
+                                id: 'm_imported_' + idx + '_' + Date.now(),
+                                name: cleanText(cols[1]),
+                                laura: cleanNum(cols[2]),
+                                asier: cleanNum(cols[3]),
+                                revolut: cleanNum(cols[5]),
+                                simulacion: cleanNum(cols[11]) || cleanNum(cols[4])
+                            });
+                        }
+                    });
+
+                    if (parsedMonthly.length > 0) {
+                        setMetaTotal(parsedMeta);
+                        setSaldoInicial(parsedSaldo);
+                        setHouseMetas(parsedMetas);
+                        setContributions(parsedMonthly);
+                        persistData(parsedMonthly, parsedMeta, parsedSaldo, parsedMetas);
+                        addNotification("Importación de CSV completada", "success");
+                    }
+                } catch (err) {
+                    addNotification("Error procesando CSV", "error");
+                }
+            };
+
             return (
                 <div class="flex-1 flex flex-col min-h-screen">
                     {/* ENCABEZADO PRÉMIUM */}
@@ -554,7 +647,7 @@
                         <div class="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
                             <div class="flex items-center gap-4">
                                 <div class="p-3 bg-gradient-to-tr from-cyan-600 to-indigo-500 rounded-2xl shadow-lg shadow-indigo-500/20 text-white">
-                                    <i data-lucide="home" class="w-6 h-6"></i>
+                                    {SVGIcons.home}
                                 </div>
                                 <div>
                                     <h1 class="text-xl font-extrabold tracking-tight text-white flex items-center gap-2">
@@ -567,17 +660,17 @@
                             {/* ESTADOS DE SINCRONIZACIÓN */}
                             <div class="flex flex-wrap items-center gap-3">
                                 {firebaseStatus === 'connected' ? (
-                                    <span class="flex items-center gap-1.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 px-3 py-1.5 rounded-xl text-xs font-bold">
+                                    <span class="flex items-center gap-1.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 px-3 py-1.5 rounded-xl text-xs font-bold animate-fadeIn">
                                         <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
                                         Conectado a Firebase: housecontrol-2bace
                                     </span>
                                 ) : firebaseStatus === 'connecting' ? (
-                                    <span class="flex items-center gap-1.5 bg-amber-500/10 border border-amber-500/20 text-amber-400 px-3 py-1.5 rounded-xl text-xs font-bold">
+                                    <span class="flex items-center gap-1.5 bg-amber-500/10 border border-amber-500/20 text-amber-400 px-3 py-1.5 rounded-xl text-xs font-bold animate-fadeIn">
                                         <span class="w-2 h-2 rounded-full bg-amber-500 animate-spin"></span>
                                         Sincronizando...
                                     </span>
                                 ) : (
-                                    <span class="flex items-center gap-1.5 bg-rose-500/10 border border-rose-500/20 text-rose-400 px-3 py-1.5 rounded-xl text-xs font-bold">
+                                    <span class="flex items-center gap-1.5 bg-rose-500/10 border border-rose-500/20 text-rose-400 px-3 py-1.5 rounded-xl text-xs font-bold animate-fadeIn">
                                         <span class="w-2 h-2 rounded-full bg-rose-500"></span>
                                         Base de datos desconectada (Local)
                                     </span>
@@ -594,7 +687,7 @@
                                 n.type === 'error' ? 'bg-rose-950/95 text-rose-300 border-rose-500/30' :
                                 'bg-slate-900/95 text-slate-200 border-slate-700'
                             }`}>
-                                <i data-lucide={n.type === 'success' ? 'check-circle' : n.type === 'error' ? 'alert-triangle' : 'info'} class="w-4 h-4 text-brand-400"></i>
+                                <span class="text-brand-400 shrink-0">{SVGIcons.save}</span>
                                 <span>{n.message}</span>
                             </div>
                         ))}
@@ -625,27 +718,27 @@
                         {/* Selector de Pestañas (Lateral Izquierdo) */}
                         <div class="lg:col-span-3 flex flex-row lg:flex-col gap-1.5 overflow-x-auto pb-3 lg:pb-0 border-b lg:border-b-0 lg:border-r border-slate-800/60 lg:pr-4">
                             <button onClick={() => setCurrentTab('dashboard')} class={`flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-bold uppercase tracking-wider transition shrink-0 ${currentTab === 'dashboard' ? 'bg-cyan-500/10 border border-cyan-500/20 text-cyan-400' : 'hover:bg-slate-900 text-slate-400'}`}>
-                                <i data-lucide="layout-dashboard" class="w-4 h-4"></i>
+                                {SVGIcons.wallet}
                                 Cuenta Conjunta Revolut
                             </button>
                             <button onClick={() => setCurrentTab('simulation')} class={`flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-bold uppercase tracking-wider transition shrink-0 ${currentTab === 'simulation' ? 'bg-cyan-500/10 border border-cyan-500/20 text-cyan-400' : 'hover:bg-slate-900 text-slate-400'}`}>
-                                <i data-lucide="calculator" class="w-4 h-4"></i>
+                                {SVGIcons.scale}
                                 Registro de Historial
                             </button>
                             <button onClick={() => setCurrentTab('projections')} class={`flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-bold uppercase tracking-wider transition shrink-0 ${currentTab === 'projections' ? 'bg-amber-500/10 border border-amber-500/20 text-amber-400' : 'hover:bg-slate-900 text-slate-400'}`}>
-                                <i data-lucide="trending-up" class="w-4 h-4"></i>
+                                {SVGIcons.hourglass}
                                 Proyección de Futuro
                             </button>
                             <button onClick={() => setCurrentTab('furniture')} class={`flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-bold uppercase tracking-wider transition shrink-0 ${currentTab === 'furniture' ? 'bg-pink-500/10 border border-pink-500/20 text-pink-400' : 'hover:bg-slate-900 text-slate-400'}`}>
-                                <i data-lucide="sofa" class="w-4 h-4"></i>
+                                {SVGIcons.home}
                                 Presupuesto Muebles
                             </button>
                             <button onClick={() => setCurrentTab('mortgage')} class={`flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-bold uppercase tracking-wider transition shrink-0 ${currentTab === 'mortgage' ? 'bg-purple-500/10 border border-purple-500/20 text-purple-400' : 'hover:bg-slate-900 text-slate-400'}`}>
-                                <i data-lucide="percent" class="w-4 h-4"></i>
+                                {SVGIcons.save}
                                 Planificación Hipoteca
                             </button>
                             <button onClick={() => setCurrentTab('config')} class={`flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-bold uppercase tracking-wider transition shrink-0 ${currentTab === 'config' ? 'bg-slate-800 border border-slate-700 text-slate-200' : 'hover:bg-slate-900 text-slate-500'}`}>
-                                <i data-lucide="settings" class="w-4 h-4"></i>
+                                {SVGIcons.settings}
                                 Configuración Nube
                             </button>
                         </div>
@@ -662,11 +755,11 @@
                                             <div class="absolute right-0 bottom-0 translate-x-4 translate-y-4 w-28 h-28 bg-cyan-500/5 rounded-full group-hover:scale-125 transition duration-500"></div>
                                             <div class="flex items-center justify-between mb-3">
                                                 <span class="text-xs font-bold text-slate-400 uppercase tracking-widest">Saldo Real Revolut</span>
-                                                <div class="p-2 bg-cyan-500/10 text-cyan-400 rounded-xl"><i data-lucide="credit-card" class="w-4 h-4"></i></div>
+                                                <div class="p-2 bg-cyan-500/10 text-cyan-400 rounded-xl">{SVGIcons.wallet}</div>
                                             </div>
                                             <div class="text-3xl font-extrabold text-white">{processedData.saldoRevolutActual.toLocaleString('es-ES', { minimumFractionDigits: 2 })} €</div>
                                             <p class="text-[11px] text-cyan-400 font-semibold mt-2 flex items-center gap-1">
-                                                <span class="w-1.5 h-1.5 rounded-full bg-cyan-400"></span>
+                                                <span class="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping"></span>
                                                 Total acumulado en cuenta conjunta
                                             </p>
                                         </div>
@@ -676,7 +769,7 @@
                                             <div class="absolute right-0 bottom-0 translate-x-4 translate-y-4 w-28 h-28 bg-amber-500/5 rounded-full group-hover:scale-125 transition duration-500"></div>
                                             <div class="flex items-center justify-between mb-3">
                                                 <span class="text-xs font-bold text-slate-400 uppercase tracking-widest">Pendiente Entrada</span>
-                                                <div class="p-2 bg-amber-500/10 text-amber-400 rounded-xl"><i data-lucide="hourglass" class="w-4 h-4"></i></div>
+                                                <div class="p-2 bg-amber-500/10 text-amber-400 rounded-xl">{SVGIcons.hourglass}</div>
                                             </div>
                                             <div class="text-3xl font-extrabold text-white">{(Math.max(0, metaTotal - processedData.totalAhorrado)).toLocaleString('es-ES', { minimumFractionDigits: 2 })} €</div>
                                             <p class="text-[11px] text-slate-400 mt-2">Para cubrir gastos, entrada e IVA</p>
@@ -687,19 +780,42 @@
                                             <div class="absolute right-0 bottom-0 translate-x-4 translate-y-4 w-28 h-28 bg-pink-500/5 rounded-full group-hover:scale-125 transition duration-500"></div>
                                             <div class="flex items-center justify-between mb-3">
                                                 <span class="text-xs font-bold text-slate-400 uppercase tracking-widest">Presupuesto Muebles</span>
-                                                <div class="p-2 bg-pink-500/10 text-pink-400 rounded-xl"><i data-lucide="shopping-bag" class="w-4 h-4"></i></div>
+                                                <div class="p-2 bg-pink-500/10 text-pink-400 rounded-xl">{SVGIcons.home}</div>
                                             </div>
                                             <div class="text-3xl font-extrabold text-white">{processedData.totalMueblesPresupuesto.toLocaleString('es-ES')} €</div>
                                             <p class="text-[11px] text-pink-400 font-semibold mt-2">Ya pagado: {processedData.totalMueblesGastado.toLocaleString('es-ES')} €</p>
                                         </div>
                                     </div>
 
+                                    {/* SECCIÓN DE GRÁFICO VECTORIAL INTERACTIVO COMPATIBLE */}
+                                    <div class="bg-slate-900/40 p-6 rounded-3xl border border-slate-800 shadow-xl space-y-4">
+                                        <div class="flex justify-between items-center">
+                                            <div>
+                                                <h3 class="text-sm font-bold text-white uppercase tracking-wider">Curva de Ahorro Real vs Simulación</h3>
+                                                <p class="text-xs text-slate-400">Trayectoria actual acumulada de vuestro plan</p>
+                                            </div>
+                                            <div class="flex items-center gap-4 text-xs font-bold">
+                                                <span class="flex items-center gap-1.5 text-cyan-400">
+                                                    <span class="w-3 h-3 rounded-full bg-cyan-500"></span> Real Acumulado
+                                                </span>
+                                                <span class="flex items-center gap-1.5 text-indigo-400">
+                                                    <span class="w-3 h-1.5 border-t-2 border-dashed border-indigo-400"></span> Simulación
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        {/* Gráfico SVG Programado Nativo en React (100% libre de cuelgues) */}
+                                        <div class="w-full bg-slate-950/60 p-4 rounded-2xl border border-slate-800/80">
+                                            <ResponsiveSVGChart rows={processedData.rows} metaTotal={metaTotal} />
+                                        </div>
+                                    </div>
+
                                     {/* SECCIÓN 50/50: EQUILIBRIO DE PAREJA */}
-                                    <div class="bg-slate-900/40 p-6 rounded-3xl border border-slate-800/80 space-y-6">
+                                    <div class="bg-slate-900/40 p-6 rounded-3xl border border-slate-800 space-y-6">
                                         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                                             <div>
                                                 <h3 class="text-base font-extrabold text-white flex items-center gap-2">
-                                                    <i data-lucide="scale" class="w-5 h-5 text-indigo-400"></i>
+                                                    <span class="text-indigo-400">{SVGIcons.scale}</span>
                                                     Acuerdo de Co-Inversión al 50/50
                                                 </h3>
                                                 <p class="text-xs text-slate-400">Control estricto para que vuestras aportaciones acumuladas estén siempre en armonía</p>
@@ -740,7 +856,7 @@
                                         {/* Caja de Compensación Dinámica */}
                                         {processedData.totalLaura !== processedData.totalAsier && (
                                             <div class="bg-indigo-500/5 border border-indigo-500/15 p-4 rounded-2xl flex items-center gap-3.5 text-xs">
-                                                <div class="p-2 bg-indigo-500/10 text-indigo-400 rounded-lg shrink-0"><i data-lucide="arrow-right-left" class="w-4 h-4"></i></div>
+                                                <span class="p-2 bg-indigo-500/10 text-indigo-400 rounded-lg shrink-0">{SVGIcons.scale}</span>
                                                 <p class="text-slate-300 leading-relaxed">
                                                     Para igualar la balanza al 50/50, <strong>{processedData.totalLaura < processedData.totalAsier ? 'Laura' : 'Asier'}</strong> debería ingresar un pago de compensación de <strong class="text-indigo-400 font-extrabold">{(Math.abs(processedData.totalLaura - processedData.totalAsier) / 2).toLocaleString('es-ES', { minimumFractionDigits: 2 })} €</strong> en la cuenta de Revolut o realizar una transferencia directa.
                                                 </p>
@@ -750,7 +866,7 @@
                                 </div>
                             )}
 
-                            {/* PESTAÑA: CONTROL HISTÓRICO (REGISTRO Y EDICIÓN) */}
+                            {/* PESTAÑA: CONTROL HISTÓRICO */}
                             {currentTab === 'simulation' && (
                                 <div class="space-y-6 animate-fadeIn">
                                     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -759,7 +875,7 @@
                                             <p class="text-xs text-slate-400 font-medium">Añade vuestras nóminas e ingresos mensuales directos. Reemplaza de forma permanente vuestra hoja de cálculo.</p>
                                         </div>
                                         <button onClick={addNewMonth} class="flex items-center gap-2 bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-extrabold px-4 py-2.5 rounded-xl transition shadow-lg shadow-cyan-500/20 shrink-0">
-                                            <i data-lucide="plus-circle" class="w-4 h-4"></i>
+                                            {SVGIcons.plus}
                                             Registrar Mes
                                         </button>
                                     </div>
@@ -767,7 +883,7 @@
                                     {/* Formulario de Edición */}
                                     {editingMonth && (
                                         <div class="bg-slate-900 border border-cyan-500/30 rounded-3xl p-5 space-y-4 shadow-xl">
-                                            <h3 class="font-bold text-cyan-400 flex items-center gap-1.5 text-sm"><i data-lucide="edit-3" class="w-4 h-4"></i> Editar Mes Seleccionado</h3>
+                                            <h3 class="font-bold text-cyan-400 flex items-center gap-1.5 text-sm">{SVGIcons.edit} Editar Mes Seleccionado</h3>
                                             <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
                                                 <div>
                                                     <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Nombre</label>
@@ -828,10 +944,10 @@
                                                             <td class="p-4">
                                                                 <div class="flex justify-end gap-1.5">
                                                                     <button onClick={() => startEdit(row)} class="p-1.5 bg-slate-800/60 hover:bg-cyan-500/10 text-slate-400 hover:text-cyan-400 rounded-lg transition">
-                                                                        <i data-lucide="edit-2" class="w-3.5 h-3.5"></i>
+                                                                        {SVGIcons.edit}
                                                                     </button>
                                                                     <button onClick={() => deleteMonth(row.id)} class="p-1.5 bg-slate-800/60 hover:bg-rose-500/10 text-slate-400 hover:text-rose-400 rounded-lg transition">
-                                                                        <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                                                                        {SVGIcons.trash}
                                                                     </button>
                                                                 </div>
                                                             </td>
@@ -844,12 +960,12 @@
                                 </div>
                             )}
 
-                            {/* PESTAÑA: RINCÓN DE TRANQUILIDAD (PROYECTOR Y CONSEJOS) */}
+                            {/* PESTAÑA: RINCÓN DE TRANQUILIDAD */}
                             {currentTab === 'projections' && (
                                 <div class="space-y-6 animate-fadeIn">
                                     <div class="bg-gradient-to-tr from-amber-600/10 via-amber-600/5 to-transparent p-6 rounded-3xl border border-amber-500/20">
                                         <div class="flex items-center gap-3 mb-2">
-                                            <div class="p-2.5 bg-amber-500/15 text-amber-400 rounded-2xl"><i data-lucide="hourglass" class="w-6 h-6 animate-spin"></i></div>
+                                            <div class="p-2.5 bg-amber-500/15 text-amber-400 rounded-2xl">{SVGIcons.hourglass}</div>
                                             <div>
                                                 <h2 class="text-lg font-black text-white">El Rincón de la Tranquilidad</h2>
                                                 <p class="text-xs text-slate-400">Vuestra herramienta interactiva para estimar cuándo podréis firmar las escrituras con plena paz mental</p>
@@ -919,24 +1035,18 @@
 
                                     {/* DIAGNÓSTICO FINANCIERO Y CONSEJOS EN TIEMPO REAL */}
                                     <div class="bg-slate-900/30 p-6 rounded-3xl border border-slate-800 space-y-4">
-                                        <h3 class="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-1.5"><i data-lucide="sparkles" class="text-amber-400 w-4.5 h-4.5"></i> Informe del Diagnóstico Financiero</h3>
+                                        <h3 class="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-1.5">★ Informe del Diagnóstico Financiero</h3>
                                         <div class="space-y-3 text-xs leading-relaxed text-slate-300">
                                             <div class="p-3 bg-slate-900/60 rounded-xl border border-slate-800 flex items-start gap-2.5">
-                                                <div class="p-1 bg-emerald-500/10 text-emerald-400 rounded-md shrink-0"><i data-lucide="check" class="w-4 h-4"></i></div>
+                                                <div class="p-1 bg-emerald-500/10 text-emerald-400 rounded-md shrink-0">✓</div>
                                                 <p>
                                                     <strong>Buen ritmo de fondo:</strong> Vuestra velocidad de ahorro real promedio está en torno a los <strong class="text-emerald-400">{projections.actualMonthlyVelocity.toFixed(0)} € al mes</strong>. A este paso, el fondo para el pago final de la entrada estará cubierto de sobra antes de que vuestra constructora exija la firma definitiva de escrituras.
                                                 </p>
                                             </div>
                                             <div class="p-3 bg-slate-900/60 rounded-xl border border-slate-800 flex items-start gap-2.5">
-                                                <div class="p-1 bg-cyan-500/10 text-cyan-400 rounded-md shrink-0"><i data-lucide="lightbulb" class="w-4 h-4"></i></div>
+                                                <div class="p-1 bg-cyan-500/10 text-cyan-400 rounded-md shrink-0">ℹ</div>
                                                 <p>
                                                     <strong>Recomendación para armarios e iluminación:</strong> Es ideal acometer la distribución y equipamiento interior de los armarios, así como la instalación de focos e iluminaciones, justo antes de meter los muebles voluminosos de las habitaciones. Facilita enormemente el trabajo y evita llenar de polvo vuestro sofá o estructuras de cama.
-                                                </p>
-                                            </div>
-                                            <div class="p-3 bg-slate-900/60 rounded-xl border border-slate-800 flex items-start gap-2.5">
-                                                <div class="p-1 bg-purple-500/10 text-purple-400 rounded-md shrink-0"><i data-lucide="info" class="w-4 h-4"></i></div>
-                                                <p>
-                                                    <strong>Aprovechamiento de intereses en Revolut:</strong> Recordad configurar una cuenta remunerada (Flexible Account) dentro de vuestra app de Revolut. Al ritmo de saldo líquido conjunto que manejáis, podéis generar rentabilidades pasivas adicionales para financiar pequeñas compras del hogar sin esfuerzo.
                                                 </p>
                                             </div>
                                         </div>
@@ -1031,10 +1141,10 @@
                                                                 }`}
                                                                 title={item.status === 'Comprado' ? 'Marcar como Pendiente' : 'Marcar como Comprado'}
                                                             >
-                                                                <i data-lucide={item.status === 'Comprado' ? 'check-square' : 'square'} class="w-4 h-4"></i>
+                                                                {SVGIcons.save}
                                                             </button>
                                                             <button onClick={() => deleteFurnitureItem(item.id)} class="p-2 bg-slate-850 hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 rounded-xl transition">
-                                                                <i data-lucide="trash" class="w-4 h-4"></i>
+                                                                {SVGIcons.trash}
                                                             </button>
                                                         </div>
                                                     </div>
@@ -1045,12 +1155,12 @@
                                 </div>
                             )}
 
-                            {/* PESTAÑA: PLAN DE HIPOTECA (MORTGAGE) */}
+                            {/* PESTAÑA: PLAN DE HIPOTECA */}
                             {currentTab === 'mortgage' && (
                                 <div class="space-y-6 animate-fadeIn">
                                     <div class="bg-gradient-to-tr from-purple-600/10 via-purple-600/5 to-transparent p-6 rounded-3xl border border-purple-500/20">
                                         <div class="flex items-center gap-3">
-                                            <div class="p-2.5 bg-purple-500/15 text-purple-400 rounded-2xl"><i data-lucide="landmark" class="w-6 h-6"></i></div>
+                                            <div class="p-2.5 bg-purple-500/15 text-purple-400 rounded-2xl">{SVGIcons.home}</div>
                                             <div>
                                                 <h2 class="text-lg font-black text-white">Simulador de Hipoteca & Viabilidad Financiera</h2>
                                                 <p class="text-xs text-slate-400">Analiza el impacto del préstamo hipotecario del piso en vuestra economía mensual familiar</p>
@@ -1148,27 +1258,27 @@
                                             <button onClick={resetToDefaultCredentials} class="text-xs text-rose-400 hover:underline">Restaurar Originales</button>
                                         </div>
                                         <p class="text-xs text-slate-400 leading-relaxed">
-                                            Por defecto, la aplicación utiliza las credenciales que has facilitado para conectar con la base de datos de vuestro proyecto <strong>housecontrol-2bace</strong>. Puedes modificarlas aquí si cambian las credenciales.
+                                            La aplicación utiliza las credenciales que has facilitado para conectar de manera segura con tu base de datos de <strong>housecontrol-2bace</strong> de forma gratuita.
                                         </p>
                                         <form onSubmit={updateFirebaseConfigInApp} class="space-y-3 text-xs">
                                             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                                 <div>
                                                     <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">apiKey</label>
-                                                    <input type="text" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white font-mono" value={firebaseConfigForm.apiKey} onChange={e => setFirebaseConfigForm({...firebaseConfigForm, apiKey: e.target.value})} />
+                                                    <input type="text" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white font-mono text-[11px]" value={firebaseConfigForm.apiKey} onChange={e => setFirebaseConfigForm({...firebaseConfigForm, apiKey: e.target.value})} />
                                                 </div>
                                                 <div>
                                                     <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">projectId</label>
-                                                    <input type="text" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white font-mono" value={firebaseConfigForm.projectId} onChange={e => setFirebaseConfigForm({...firebaseConfigForm, projectId: e.target.value})} />
+                                                    <input type="text" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white font-mono text-[11px]" value={firebaseConfigForm.projectId} onChange={e => setFirebaseConfigForm({...firebaseConfigForm, projectId: e.target.value})} />
                                                 </div>
                                             </div>
                                             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                                 <div>
                                                     <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">authDomain</label>
-                                                    <input type="text" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white font-mono" value={firebaseConfigForm.authDomain} onChange={e => setFirebaseConfigForm({...firebaseConfigForm, authDomain: e.target.value})} />
+                                                    <input type="text" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white font-mono text-[11px]" value={firebaseConfigForm.authDomain} onChange={e => setFirebaseConfigForm({...firebaseConfigForm, authDomain: e.target.value})} />
                                                 </div>
                                                 <div>
                                                     <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">appId</label>
-                                                    <input type="text" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white font-mono" value={firebaseConfigForm.appId} onChange={e => setFirebaseConfigForm({...firebaseConfigForm, appId: e.target.value})} />
+                                                    <input type="text" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white font-mono text-[11px]" value={firebaseConfigForm.appId} onChange={e => setFirebaseConfigForm({...firebaseConfigForm, appId: e.target.value})} />
                                                 </div>
                                             </div>
                                             <button type="submit" class="w-full bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold py-2.5 rounded-xl transition shadow-lg shadow-cyan-600/20">
@@ -1177,29 +1287,18 @@
                                         </form>
                                     </div>
 
-                                    {/* Ajustes de objetivos */}
-                                    <div class="bg-slate-900/60 p-5 rounded-3xl border border-slate-800 space-y-4">
-                                        <h3 class="font-bold text-white text-sm">Metas Globales del Proyecto</h3>
-                                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                            <div>
-                                                <label class="block text-xs font-semibold text-slate-400 mb-1">Meta Entrada Consolidada (€)</label>
-                                                <input type="number" id="metaTotalInput" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white text-xs font-bold" defaultValue={metaTotal} />
-                                            </div>
-                                            <div>
-                                                <label class="block text-xs font-semibold text-slate-400 mb-1">Saldo de Reserva Inicial (€)</label>
-                                                <input type="number" id="saldoInicialInput" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white text-xs font-bold" defaultValue={saldoInicial} />
-                                            </div>
+                                    {/* Importar Respaldos */}
+                                    <div class="bg-slate-900 border border-slate-800 rounded-3xl p-5 space-y-4 shadow-xl">
+                                        <h3 class="font-bold text-white text-sm">Carga vuestro Excel a Firebase (Respaldos .CSV)</h3>
+                                        <p class="text-xs text-slate-400 leading-relaxed">
+                                            Sube tu archivo de simulación en formato CSV para actualizar de forma inmediata todas las aportaciones históricas de Laura y Asier en vuestra nube de Firebase Firestore.
+                                        </p>
+                                        <div class="flex items-center gap-3">
+                                            <input type="file" accept=".csv" onChange={handleCSVUpload} id="csvFileInput" class="hidden" />
+                                            <label htmlFor="csvFileInput" class="cursor-pointer bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition shadow-lg shadow-emerald-500/20">
+                                                Subir Archivo CSV de Cuentas
+                                            </label>
                                         </div>
-                                        <button onClick={() => {
-                                            const m = document.getElementById('metaTotalInput').value;
-                                            const s = document.getElementById('saldoInicialInput').value;
-                                            setMetaTotal(Number(m));
-                                            setSaldoInicial(Number(s));
-                                            persistData(contributions, Number(m), Number(s));
-                                            addNotification("Objetivo general actualizado");
-                                        }} class="bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-extrabold px-4 py-2.5 rounded-xl transition">
-                                            Confirmar Nuevos Límites
-                                        </button>
                                     </div>
                                 </div>
                             )}
@@ -1215,7 +1314,92 @@
             );
         }
 
-        // Renderizado inicial de la aplicación
+        // --- SUBCOMPONENTE DE GRÁFICO VECTORIAL (SVG) EXTREMADAMENTE SEGURO Y COMPATIBLE ---
+        function ResponsiveSVGChart({ rows, metaTotal }) {
+            if (!rows || rows.length === 0) return null;
+
+            const width = 600;
+            const height = 180;
+            const padding = 30;
+
+            const maxVal = Math.max(...rows.map(r => Math.max(r.acumulado, r.simulacionAcumulado, metaTotal))) * 1.1;
+            const minVal = 0;
+
+            // Coordenadas calculadas para la línea "Real" y "Simulación"
+            const pointsReal = rows.map((r, i) => {
+                const x = padding + (i / (rows.length - 1)) * (width - padding * 2);
+                const y = height - padding - ((r.acumulado - minVal) / (maxVal - minVal)) * (height - padding * 2);
+                return { x, y, val: r.acumulado, name: r.name };
+            });
+
+            const pointsSim = rows.map((r, i) => {
+                const x = padding + (i / (rows.length - 1)) * (width - padding * 2);
+                const y = height - padding - ((r.simulacionAcumulado - minVal) / (maxVal - minVal)) * (height - padding * 2);
+                return { x, y, val: r.simulacionAcumulado };
+            });
+
+            // Generar los comandos d="" para dibujar el path
+            const pathRealD = pointsReal.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
+            const pathSimD = pointsSim.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
+
+            // Área sombreada para el progreso real
+            const areaRealD = `${pathRealD} L ${pointsReal[pointsReal.length - 1].x} ${height - padding} L ${pointsReal[0].x} ${height - padding} Z`;
+
+            return (
+                <div class="relative w-full">
+                    <svg viewBox={`0 0 ${width} ${height}`} class="w-full h-auto text-slate-700">
+                        {/* Líneas de cuadrícula horizontales */}
+                        {[0, 0.25, 0.5, 0.75, 1].map((ratio, idx) => {
+                            const y = padding + ratio * (height - padding * 2);
+                            const valLabel = Math.round(maxVal - ratio * (maxVal - minVal));
+                            return (
+                                <g key={idx}>
+                                    <line x1={padding} y1={y} x2={width - padding} y2={y} stroke="rgba(51, 65, 85, 0.15)" strokeWidth="1" />
+                                    <text x={padding - 5} y={y + 3} fill="#475569" fontSize="8" fontWeight="bold" textAnchor="end">
+                                        {valLabel.toLocaleString('es-ES')}
+                                    </text>
+                                </g>
+                            );
+                        })}
+
+                        {/* Relleno de área de Ahorro Real */}
+                        <path d={areaRealD} fill="url(#realGradient)" opacity="0.12" />
+
+                        {/* Línea Simulación Planificada (Dashed) */}
+                        <path d={pathSimD} fill="none" stroke="#6366f1" strokeWidth="2" strokeDasharray="3,3" />
+
+                        {/* Línea Ahorro Real (Sólida) */}
+                        <path d={pathRealD} fill="none" stroke="#0ea5e9" strokeWidth="3" strokeLinecap="round" />
+
+                        {/* Puntos sobre el ahorro real */}
+                        {pointsReal.map((p, i) => (
+                            <g key={i} class="group cursor-pointer">
+                                <circle cx={p.x} cy={p.y} r="3.5" fill="#0ea5e9" stroke="#0f172a" strokeWidth="1.5" />
+                                <circle cx={p.x} cy={p.y} r="8" fill="transparent" />
+                                <title>{`${p.name}: ${Math.round(p.val).toLocaleString('es-ES')} €`}</title>
+                            </g>
+                        ))}
+
+                        {/* Etiquetas del eje X (Meses abreviados) */}
+                        {pointsReal.filter((_, idx) => idx % 2 === 0).map((p, idx) => (
+                            <text key={idx} x={p.x} y={height - 8} fill="#64748b" fontSize="8" fontWeight="bold" textAnchor="middle">
+                                {p.name.split(' ')[0]}
+                            </text>
+                        ))}
+
+                        {/* Definiciones de gradientes */}
+                        <defs>
+                            <linearGradient id="realGradient" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0%" stopColor="#0ea5e9" />
+                                <stop offset="100%" stopColor="transparent" />
+                            </linearGradient>
+                        </defs>
+                    </svg>
+                </div>
+            );
+        }
+
+        // Renderizado inicial
         const container = document.getElementById('root');
         const root = ReactDOM.createRoot(container);
         root.render(<App />);
