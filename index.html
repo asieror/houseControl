@@ -1002,7 +1002,7 @@
                                             El número de meses restantes para conseguir vuestro objetivo se calcula de forma dinámica mediante la siguiente relación matemática:
                                         </p>
                                         <div class="bg-slate-950 p-3 rounded-xl border border-slate-900 text-center text-sm font-semibold overflow-x-auto">
-                                            $$\text{Meses Restantes} = \left\lceil \frac{\text{Meta de Ahorro} - \text{Saldo Acumulado}}{\text{Ahorro Objetivo Mensual}} \right\rceil$$
+                                            {"$$\\text{Meses Restantes} = \\left\\lceil \\frac{\\text{Meta de Ahorro} - \\text{Saldo Acumulado}}{\\text{Ahorro Objetivo Mensual}} \\right\\rceil$$"}
                                         </div>
                                     </div>
 
@@ -1172,10 +1172,10 @@
                                     <div class="bg-slate-900/30 p-5 rounded-2xl border border-slate-800/80 text-xs text-slate-300">
                                         <h3 class="font-bold text-white mb-2 uppercase tracking-wide">Fórmula del Sistema de Amortización Francés</h3>
                                         <p class="leading-relaxed mb-3">
-                                            La cuota mensual constante $M$ se calcula a partir del capital prestado $P$, el interés mensual $r = \frac{\text{TIN}}{12 \times 100}$ y el número total de cuotas mensuales $n = \text{Años} \times 12$:
+                                            {"La cuota mensual constante $M$ se calcula a partir del capital prestado $P$, el interés mensual $r = \\frac{\\text{TIN}}{12 \\times 100}$ y el número total de cuotas mensuales $n = \\text{Años} \\times 12$:"}
                                         </p>
                                         <div class="bg-slate-950 p-3 rounded-xl border border-slate-900 text-center text-sm font-semibold overflow-x-auto">
-                                            $$M = P \cdot \frac{r(1+r)^n}{(1+r)^n - 1}$$
+                                            {"$$M = P \\cdot \\frac{r(1+r)^n}{(1+r)^n - 1}$$"}
                                         </div>
                                     </div>
 
@@ -1338,7 +1338,7 @@
                 return { x, y, val: r.simulacionAcumulado };
             });
 
-            // Generar los comandos d="" para dibujar el path
+            // Generar los comandos d="" para dbuixar el path
             const pathRealD = pointsReal.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
             const pathSimD = pointsSim.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
 
