@@ -162,12 +162,17 @@
             const [houseMetas, setHouseMetas] = useState(DEFAULT_METAS);
             const [furnitureBudget, setFurnitureBudget] = useState(DEFAULT_FURNITURE_BUDGET);
             
-            // Corrector e Interés diario de Revolut
-            const [revolutCorrection, setRevolutCorrection] = useState(1324.50); // Ajuste inicial de vuestro saldo real acumulado
+            // Corrector e Interés diario de Revolut (AUTOMATIZADO AL 1.15% ANUAL)
+            const [revolutCorrection, setRevolutCorrection] = useState(1324.50); 
             const [revolutCorrectionReason, setRevolutCorrectionReason] = useState("Redondeos acumulados y céntimos extra de Revolut");
-            const [dailyInterestRate, setDailyInterestRate] = useState(0.08); // 8 céntimos/día
-            const [reconciliationDate, setReconciliationDate] = useState("2026-06-01"); // Fecha de partida para el conteo de días
+            const [annualInterestRate, setAnnualInterestRate] = useState(1.15); // 1.15% Anual por defecto, pagado de forma diaria
+            const [reconciliationDate, setReconciliationDate] = useState("2026-06-01"); 
             const [liveSeconds, setLiveSeconds] = useState(0); 
+
+            // --- ESTADOS DE APORTACIÓN INICIAL DE ENTRADA (LAURA vs ASIER) ---
+            const [lauraInitialPayment, setLauraInitialPayment] = useState(33000); // Laura puso 33.000 €
+            const [asierInitialPayment, setAsierInitialPayment] = useState(10000); // Asier puso 10.000 €
+            const [repaidToLaura, setRepaidToLaura] = useState(0); // Cantidad que Asier ya ha devuelto poco a poco
 
             // Autenticación de usuarios
             const [user, setUser] = useState(null);
@@ -194,6 +199,18 @@
             const [firebaseConfigForm, setFirebaseConfigForm] = useState(DEFAULT_FIREBASE_CREDENTIALS);
             const [firebaseError, setFirebaseError] = useState(null);
 
+            // Estados temporales locales para evitar bloqueos de input al escribir (Typing block resolved)
+            const [tempCorrection, setTempCorrection] = useState("1324.50");
+            const [tempCorrectionReason, setTempCorrectionReason] = useState("Redondeos acumulados y céntimos extra de Revolut");
+            const [tempRepaidAmount, setTempRepaidAmount] = useState("0");
+
+            // Sincronizar estados locales cuando cambia la base de datos de fondo
+            useEffect(() => {
+                setTempCorrection(revolutCorrection.toString());
+                setTempCorrectionReason(revolutCorrectionReason);
+                setTempRepaidAmount(repaidToLaura.toString());
+            }, [revolutCorrection, revolutCorrectionReason, repaidToLaura]);
+
             // Notificaciones
             const [notifications, setNotifications] = useState([]);
             const addNotification = (message, type = 'success') => {
@@ -207,7 +224,7 @@
             const dbRef = useRef(null);
             const syncUnsubscribe = useRef(null);
 
-            // Reloj para actualización pasiva de intereses en "tiempo real"
+            // Reloj para actualización pasiva de intereses en tiempo real
             useEffect(() => {
                 const interval = setInterval(() => {
                     setLiveSeconds(prev => prev + 1);
@@ -242,18 +259,36 @@
                 const localEmails = localStorage.getItem('casa_local_allowed_emails');
                 const localPin = localStorage.getItem('casa_local_family_pin');
 
+                // Nuevos locales
+                const localLauraInit = localStorage.getItem('casa_local_laura_initial');
+                const localAsierInit = localStorage.getItem('casa_local_asier_initial');
+                const localRepaid = localStorage.getItem('casa_local_repaid_laura');
+
                 if (localData) setContributions(JSON.parse(localData));
                 if (localMeta) setMetaTotal(parseFloat(localMeta));
                 if (localSaldo) setSaldoInicial(parseFloat(localSaldo));
                 if (localMetas) setHouseMetas(JSON.parse(localMetas));
                 if (localFurniture) setFurnitureBudget(JSON.parse(localFurniture));
 
-                if (localCorr) setRevolutCorrection(parseFloat(localCorr));
-                if (localReason) setRevolutCorrectionReason(localReason);
-                if (localIntRate) setDailyInterestRate(parseFloat(localIntRate));
+                if (localCorr) {
+                    setRevolutCorrection(parseFloat(localCorr));
+                    setTempCorrection(localCorr);
+                }
+                if (localReason) {
+                    setRevolutCorrectionReason(localReason);
+                    setTempCorrectionReason(localReason);
+                }
+                if (localIntRate) setAnnualInterestRate(parseFloat(localIntRate));
                 if (localRecDate) setReconciliationDate(localRecDate);
                 if (localEmails) setAllowedEmails(JSON.parse(localEmails));
                 if (localPin) setFamilyPin(localPin);
+
+                if (localLauraInit) setLauraInitialPayment(parseFloat(localLauraInit));
+                if (localAsierInit) setAsierInitialPayment(parseFloat(localAsierInit));
+                if (localRepaid) {
+                    setRepaidToLaura(parseFloat(localRepaid));
+                    setTempRepaidAmount(localRepaid);
+                }
             };
 
             // Conexión a Firebase utilizando el SDK compatible para evitar fallos de compilación dinámicos
@@ -276,7 +311,6 @@
                     const db = firebase.firestore();
                     dbRef.current = db;
 
-                    // Escuchar estado de autenticación de Firebase
                     auth.onAuthStateChanged((firebaseUser) => {
                         if (firebaseUser) {
                             if (firebaseUser.email) {
@@ -302,7 +336,6 @@
                         }
                     });
 
-                    // REGLA 1: Usar rutas de almacenamiento estrictas para config general
                     const appIdSlug = config.projectId || 'housecontrol-2bace';
                     const pathConfig = db.collection('artifacts').doc(appIdSlug).collection('public').doc('data').collection('config').doc('meta_config');
                     
@@ -313,18 +346,30 @@
                             if (data.saldoInicial) setSaldoInicial(data.saldoInicial);
                             if (data.houseMetas) setHouseMetas(data.houseMetas);
                             if (data.furnitureBudget) setFurnitureBudget(data.furnitureBudget);
-                            if (data.revolutCorrection !== undefined) setRevolutCorrection(data.revolutCorrection);
-                            if (data.revolutCorrectionReason !== undefined) setRevolutCorrectionReason(data.revolutCorrectionReason);
-                            if (data.dailyInterestRate !== undefined) setDailyInterestRate(data.dailyInterestRate);
+                            if (data.revolutCorrection !== undefined) {
+                                setRevolutCorrection(data.revolutCorrection);
+                                setTempCorrection(data.revolutCorrection.toString());
+                            }
+                            if (data.revolutCorrectionReason !== undefined) {
+                                setRevolutCorrectionReason(data.revolutCorrectionReason);
+                                setTempCorrectionReason(data.revolutCorrectionReason);
+                            }
+                            if (data.annualInterestRate !== undefined) setAnnualInterestRate(data.annualInterestRate);
                             if (data.reconciliationDate !== undefined) setReconciliationDate(data.reconciliationDate);
                             if (data.allowedEmails !== undefined) setAllowedEmails(data.allowedEmails);
                             if (data.familyPin !== undefined) setFamilyPin(data.familyPin);
+
+                            if (data.lauraInitialPayment !== undefined) setLauraInitialPayment(data.lauraInitialPayment);
+                            if (data.asierInitialPayment !== undefined) setAsierInitialPayment(data.asierInitialPayment);
+                            if (data.repaidToLaura !== undefined) {
+                                setRepaidToLaura(data.repaidToLaura);
+                                setTempRepaidAmount(data.repaidToLaura.toString());
+                            }
                         }
                     }, (error) => {
                         console.warn("Fallo al leer config de Firestore, usando locales", error);
                     });
 
-                    // REGLA 2: Consultar la colección completa sin filtros complejos
                     const contribCollection = db.collection('artifacts').doc(appIdSlug).collection('public').doc('data').collection('contributions');
                     if (syncUnsubscribe.current) syncUnsubscribe.current();
                     
@@ -351,7 +396,7 @@
                 }
             };
 
-            const persistData = async (updatedContribs, updatedMeta, updatedSaldo, updatedMetas, updatedFurniture, updatedCorr, updatedReason, updatedIntRate, updatedRecDate, updatedEmails, updatedPin) => {
+            const persistData = async (updatedContribs, updatedMeta, updatedSaldo, updatedMetas, updatedFurniture, updatedCorr, updatedReason, updatedIntRate, updatedRecDate, updatedEmails, updatedPin, updatedLauraInit, updatedAsierInit, updatedRepaid) => {
                 const mTotal = updatedMeta !== undefined ? updatedMeta : metaTotal;
                 const sInicial = updatedSaldo !== undefined ? updatedSaldo : saldoInicial;
                 const listContribs = updatedContribs !== undefined ? updatedContribs : contributions;
@@ -360,10 +405,14 @@
                 
                 const rCorr = updatedCorr !== undefined ? updatedCorr : revolutCorrection;
                 const rReason = updatedReason !== undefined ? updatedReason : revolutCorrectionReason;
-                const dRate = updatedIntRate !== undefined ? updatedIntRate : dailyInterestRate;
+                const aIntRate = updatedIntRate !== undefined ? updatedIntRate : annualInterestRate;
                 const rDate = updatedRecDate !== undefined ? updatedRecDate : reconciliationDate;
                 const aEmails = updatedEmails !== undefined ? updatedEmails : allowedEmails;
                 const fPin = updatedPin !== undefined ? updatedPin : familyPin;
+
+                const lInit = updatedLauraInit !== undefined ? updatedLauraInit : lauraInitialPayment;
+                const aInit = updatedAsierInit !== undefined ? updatedAsierInit : asierInitialPayment;
+                const repaid = updatedRepaid !== undefined ? updatedRepaid : repaidToLaura;
 
                 if (firebaseStatus === 'connected' && dbRef.current) {
                     try {
@@ -376,10 +425,13 @@
                             furnitureBudget: fBudget,
                             revolutCorrection: rCorr,
                             revolutCorrectionReason: rReason,
-                            dailyInterestRate: dRate,
+                            annualInterestRate: aIntRate,
                             reconciliationDate: rDate,
                             allowedEmails: aEmails,
-                            familyPin: fPin
+                            familyPin: fPin,
+                            lauraInitialPayment: lInit,
+                            asierInitialPayment: aInit,
+                            repaidToLaura: repaid
                         });
 
                         for (let i = 0; i < listContribs.length; i++) {
@@ -405,11 +457,32 @@
 
                     localStorage.setItem('casa_local_revolut_correction', rCorr.toString());
                     localStorage.setItem('casa_local_revolut_reason', rReason);
-                    localStorage.setItem('casa_local_revolut_intrate', dRate.toString());
+                    localStorage.setItem('casa_local_revolut_intrate', aIntRate.toString());
                     localStorage.setItem('casa_local_revolut_recdate', rDate);
                     localStorage.setItem('casa_local_allowed_emails', JSON.stringify(aEmails));
                     localStorage.setItem('casa_local_family_pin', fPin);
+
+                    localStorage.setItem('casa_local_laura_initial', lInit.toString());
+                    localStorage.setItem('casa_local_asier_initial', aInit.toString());
+                    localStorage.setItem('casa_local_repaid_laura', repaid.toString());
                 }
+            };
+
+            // Guardar cambios aplicados manualmente al balance o intereses sin bloqueos
+            const saveBalanceAdjustment = () => {
+                const correctionNum = parseFloat(tempCorrection) || 0;
+                setRevolutCorrection(correctionNum);
+                setRevolutCorrectionReason(tempCorrectionReason);
+                persistData(contributions, metaTotal, saldoInicial, houseMetas, furnitureBudget, correctionNum, tempCorrectionReason);
+                addNotification("Ajuste de balance guardado con éxito");
+            };
+
+            // Guardar reembolso de Asier a Laura
+            const saveRepaidAmount = () => {
+                const repaidNum = parseFloat(tempRepaidAmount) || 0;
+                setRepaidToLaura(repaidNum);
+                persistData(contributions, metaTotal, saldoInicial, houseMetas, furnitureBudget, revolutCorrection, revolutCorrectionReason, annualInterestRate, reconciliationDate, allowedEmails, familyPin, lauraInitialPayment, asierInitialPayment, repaidNum);
+                addNotification("Historial de devolución actualizado");
             };
 
             // Login por Google
@@ -474,7 +547,7 @@
                 }
                 try {
                     addNotification("Sincronizando datos con la Nube...", "info");
-                    await persistData(contributions, metaTotal, saldoInicial, houseMetas, furnitureBudget);
+                    await persistData(contributions, metaTotal, saldoInicial, houseMetas, furnitureBudget, revolutCorrection, revolutCorrectionReason, annualInterestRate, reconciliationDate, allowedEmails, familyPin, lauraInitialPayment, asierInitialPayment, repaidToLaura);
                     addNotification("¡Todos tus datos han sido sincronizados y guardados en Firebase!", "success");
                 } catch (err) {
                     console.error("Error al inicializar base de datos:", err);
@@ -516,21 +589,41 @@
                 const totalAhorrado = currentAccumulated;
                 const porcentajeProgreso = Math.min(100, (totalAhorrado / metaTotal) * 100);
                 
+                // Saldo base de la última conciliación
                 const lastMonthRevolutBase = contributions.length > 0 ? Number(contributions[contributions.length - 1].revolut) : saldoInicial;
 
-                // Calcular intereses acumulados desde el día de la conciliación hasta HOY
+                // --- NUEVO SISTEMA DE INTERÉS DEL 1.15% COMPUESTO DIARIO AUTOMÁTICO ---
+                const balanceAntesDeIntereses = lastMonthRevolutBase + revolutCorrection;
+
                 const lastDate = new Date(reconciliationDate || "2026-06-01");
                 const today = new Date();
                 const diffTime = Math.max(0, today - lastDate);
                 const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-                const accumulatedInterestRealTime = diffDays * dailyInterestRate;
+                
+                // Fórmula compuesta diaria basada en TIN anual: r_diario = (TIN / 100) / 365
+                const r_diario = (annualInterestRate / 100) / 365;
+                const accumulatedInterestRealTime = balanceAntesDeIntereses * (Math.pow(1 + r_diario, diffDays) - 1);
 
-                // Saldo Revolut final aplicando intereses diarios y correctivo manual
-                const saldoRevolutActual = lastMonthRevolutBase + revolutCorrection + accumulatedInterestRealTime;
+                // Cuánto genera por día en este momento exacto
+                const interestPerDay = (balanceAntesDeIntereses + accumulatedInterestRealTime) * r_diario;
+
+                // Saldo Revolut final aplicando el interés compuesto acumulado en tiempo real y corrector manual
+                const saldoRevolutActual = balanceAntesDeIntereses + accumulatedInterestRealTime;
 
                 // Muebles
                 const totalMueblesPresupuesto = furnitureBudget.reduce((sum, item) => sum + item.amount, 0);
                 const totalMueblesGastado = furnitureBudget.reduce((sum, item) => sum + item.spent, 0);
+
+                // --- NUEVO CÁLCULO DE BALANCE DE COMPENSACIÓN GLOBAL ---
+                // Laura puso 33.000 € y Asier puso 10.000 € para la entrada del primer 10%.
+                const deudaInicialAsierALaura = (lauraInitialPayment - asierInitialPayment) / 2;
+                const deudaInicialPendiente = Math.max(0, deudaInicialAsierALaura - repaidToLaura);
+
+                // Diferencia en ingresos mensuales de Revolut
+                const deudaMensualAsierALaura = (totalLaura - totalAsier) / 2;
+
+                // Balance de Compensación consolidado final (Initial Debt + Monthly Transfer Debt)
+                const balanceConsolidadoAsierALaura = deudaInicialPendiente + deudaMensualAsierALaura;
 
                 return {
                     rows,
@@ -541,12 +634,17 @@
                     lastMonthRevolutBase,
                     accumulatedInterestRealTime,
                     diffDays,
+                    interestPerDay,
                     saldoRevolutActual,
                     totalSimulacion,
                     totalMueblesPresupuesto,
-                    totalMueblesGastado
+                    totalMueblesGastado,
+                    deudaInicialAsierALaura,
+                    deudaInicialPendiente,
+                    deudaMensualAsierALaura,
+                    balanceConsolidadoAsierALaura
                 };
-            }, [contributions, metaTotal, saldoInicial, furnitureBudget, reconciliationDate, dailyInterestRate, revolutCorrection, liveSeconds]);
+            }, [contributions, metaTotal, saldoInicial, furnitureBudget, reconciliationDate, annualInterestRate, revolutCorrection, liveSeconds, lauraInitialPayment, asierInitialPayment, repaidToLaura]);
 
             // --- PROYECCIONES DE TIEMPO Y CONSEJOS ---
             const projections = useMemo(() => {
@@ -611,201 +709,65 @@
                 };
             }, [interestRate, loanTermYears]);
 
-            // --- GESTIÓN DE EDICIONES DE MESES ---
-            const [editingMonth, setEditingMonth] = useState(null);
-            const [editForm, setEditForm] = useState({ name: "", laura: 0, asier: 0, revolut: 0, simulacion: 0 });
+            // --- VISTA DE LOGIN ---
+            if (!isAuthenticated) {
+                return (
+                    <div class="min-h-screen flex items-center justify-center bg-slate-950 px-4 md:p-6">
+                        <div class="bg-slate-900 border border-slate-800 p-8 rounded-3xl max-w-md w-full shadow-2xl space-y-6 text-center animate-fadeIn">
+                            <div class="flex flex-col items-center gap-2">
+                                <div class="p-3.5 bg-gradient-to-tr from-cyan-600 to-indigo-500 rounded-2xl shadow-xl shadow-cyan-500/20 text-white">
+                                    {SVGIcons.lock}
+                                </div>
+                                <h1 class="text-2xl font-black text-white tracking-tight">Acceso Privado</h1>
+                                <p class="text-xs text-slate-400">Control de la Entrada & Gastos del Piso</p>
+                            </div>
 
-            const startEdit = (month) => {
-                setEditingMonth(month.id);
-                setEditForm({
-                    name: month.name,
-                    laura: month.laura,
-                    asier: month.asier,
-                    revolut: month.revolut,
-                    simulacion: month.simulacion
-                });
-            };
+                            {loginError && (
+                                <div class="bg-rose-500/10 border border-rose-500/25 p-3 rounded-xl text-xs text-rose-300 font-semibold text-left leading-relaxed">
+                                    {loginError}
+                                </div>
+                            )}
 
-            const saveEdit = () => {
-                const updated = contributions.map(c => {
-                    if (c.id === editingMonth) {
-                        return {
-                            ...c,
-                            name: editForm.name,
-                            laura: Number(editForm.laura),
-                            asier: Number(editForm.asier),
-                            revolut: Number(editForm.revolut),
-                            simulacion: Number(editForm.simulacion)
-                        };
-                    }
-                    return c;
-                });
-                setContributions(updated);
-                setEditingMonth(null);
-                persistData(updated);
-                addNotification("Aportación mensual guardada");
-            };
+                            {/* Opción 1: Acceso por Google */}
+                            <button 
+                                onClick={loginWithGoogle}
+                                class="w-full bg-slate-950 hover:bg-slate-850 text-white border border-slate-800 text-xs font-bold py-3.5 px-4 rounded-xl transition flex items-center justify-center gap-2.5 shadow-md"
+                            >
+                                {SVGIcons.google}
+                                Iniciar sesión con Google
+                            </button>
 
-            const addNewMonth = () => {
-                const nextNum = contributions.length + 1;
-                const lastMonth = contributions[contributions.length - 1];
-                const newMonth = {
-                    id: 'm_' + Date.now(),
-                    name: `Mes ${nextNum}`,
-                    laura: lastMonth ? lastMonth.laura : 800,
-                    asier: lastMonth ? lastMonth.asier : 1500,
-                    revolut: lastMonth ? lastMonth.revolut + (lastMonth.laura + lastMonth.asier) : saldoInicial + 2300,
-                    simulacion: lastMonth ? lastMonth.simulacion : 1373
-                };
-                const updated = [...contributions, newMonth];
-                setContributions(updated);
-                persistData(updated);
-                addNotification("Fila de planificación mensual añadida");
-            };
+                            <div class="relative flex py-2 items-center">
+                                <div class="flex-grow border-t border-slate-800"></div>
+                                <span class="flex-shrink mx-4 text-slate-500 text-[10px] font-black uppercase tracking-wider">o introduce vuestro PIN</span>
+                                <div class="flex-grow border-t border-slate-800"></div>
+                            </div>
 
-            const deleteMonth = (id) => {
-                if (window.confirm("¿Estás seguro de que quieres eliminar este mes del historial?")) {
-                    const updated = contributions.filter(c => c.id !== id);
-                    setContributions(updated);
-                    persistData(updated);
-                    addNotification("Mes eliminado del histórico", "info");
-                }
-            };
+                            {/* Opción 2: Acceso rápido por PIN */}
+                            <form onSubmit={handlePinLogin} class="space-y-3">
+                                <input 
+                                    type="password" 
+                                    maxLength="10"
+                                    placeholder="Introduce el PIN de pareja..."
+                                    class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-center text-sm font-bold text-white tracking-widest placeholder-slate-600 focus:outline-none focus:border-cyan-500"
+                                    value={loginPinInput}
+                                    onChange={e => setLoginPinInput(e.target.value)}
+                                />
+                                <button type="submit" class="w-full bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-black py-3 rounded-xl transition shadow-lg shadow-cyan-500/20">
+                                    Validar PIN de Acceso
+                                </button>
+                            </form>
 
-            // --- GESTIÓN DE PARTIDAS DE MUEBLES ---
-            const [newFurniture, setNewFurniture] = useState({ category: "", item: "", amount: 0, priority: "Media" });
-            const addFurnitureItem = () => {
-                if (!newFurniture.category || !newFurniture.item || !newFurniture.amount) {
-                    addNotification("Completa todos los campos para añadir el mueble", "error");
-                    return;
-                }
-                const newItem = {
-                    id: 'f_' + Date.now(),
-                    category: newFurniture.category,
-                    item: newFurniture.item,
-                    amount: Number(newFurniture.amount),
-                    spent: 0,
-                    status: 'Pendiente',
-                    priority: newFurniture.priority
-                };
-                const updated = [...furnitureBudget, newItem];
-                setFurnitureBudget(updated);
-                persistData(contributions, metaTotal, saldoInicial, houseMetas, updated);
-                setNewFurniture({ category: "", item: "", amount: 0, priority: "Media" });
-                addNotification("Partida de mueble añadida con éxito");
-            };
-
-            const deleteFurnitureItem = (id) => {
-                const updated = furnitureBudget.filter(f => f.id !== id);
-                setFurnitureBudget(updated);
-                persistData(contributions, metaTotal, saldoInicial, houseMetas, updated);
-                addNotification("Partida presupuestaria eliminada");
-            };
-
-            const toggleFurnitureStatus = (id) => {
-                const updated = furnitureBudget.map(f => {
-                    if (f.id === id) {
-                        const newStatus = f.status === 'Comprado' ? 'Pendiente' : 'Comprado';
-                        return {
-                            ...f,
-                            status: newStatus,
-                            spent: newStatus === 'Comprado' ? f.amount : 0
-                        };
-                    }
-                    return f;
-                });
-                setFurnitureBudget(updated);
-                persistData(contributions, metaTotal, saldoInicial, houseMetas, updated);
-                addNotification("Estado de compra actualizado");
-            };
-
-            const updateFirebaseConfigInApp = (e) => {
-                e.preventDefault();
-                localStorage.setItem('casa_firebase_config', JSON.stringify(firebaseConfigForm));
-                setFirebaseConfig(firebaseConfigForm);
-                connectFirebase(firebaseConfigForm);
-            };
-
-            const resetToDefaultCredentials = () => {
-                localStorage.removeItem('casa_firebase_config');
-                setFirebaseConfigForm(DEFAULT_FIREBASE_CREDENTIALS);
-                setFirebaseConfig(DEFAULT_FIREBASE_CREDENTIALS);
-                connectFirebase(DEFAULT_FIREBASE_CREDENTIALS);
-                addNotification("Restaurado a credenciales por defecto", "info");
-            };
-
-            // --- CSV IMPORT UTILITIES ---
-            const handleCSVUpload = (e) => {
-                const file = e.target.files[0];
-                if (!file) return;
-                const reader = new FileReader();
-                reader.onload = (event) => {
-                    parseCSVData(event.target.result);
-                };
-                reader.readAsText(file);
-            };
-
-            const parseCSVData = (text) => {
-                try {
-                    const lines = text.split('\n');
-                    let parsedMeta = DEFAULT_META_TOTAL;
-                    let parsedSaldo = DEFAULT_SALDO_INICIAL;
-                    let parsedMetas = [...DEFAULT_METAS];
-                    const parsedMonthly = [];
-
-                    lines.forEach(line => {
-                        const cols = line.split(',');
-                        if (cols.length < 2) return;
-
-                        const cleanText = (str) => str ? str.trim().replace(/"/g, '') : '';
-                        const cleanNum = (str) => {
-                            if (!str) return 0;
-                            let val = str.trim().replace(/"/g, '').replace('€', '').replace(/\s/g, '');
-                            if (val.includes('.') && val.includes(',')) {
-                                val = val.replace(/\./g, '').replace(',', '.');
-                            } else if (val.includes(',')) {
-                                val = val.replace(',', '.');
-                            }
-                            return parseFloat(val) || 0;
-                        };
-
-                        const label = cleanText(cols[1]);
-                        const val = cols[2];
-
-                        if (label.includes("10% Entrada Piso")) parsedMetas[0].amount = cleanNum(val);
-                        else if (label.includes("IVA (Gastos)")) parsedMetas[1].amount = cleanNum(val);
-                        else if (label.includes("Personalización")) parsedMetas[2].amount = cleanNum(val);
-                        else if (label.includes("META TOTAL")) parsedMeta = cleanNum(val);
-                        else if (label.includes("Saldo Inicial Real")) parsedSaldo = cleanNum(val);
-
-                        const idx = parseInt(cols[0]);
-                        if (!isNaN(idx) && idx > 0 && cols.length >= 6) {
-                            parsedMonthly.push({
-                                id: 'm_imported_' + idx + '_' + Date.now(),
-                                name: cleanText(cols[1]),
-                                laura: cleanNum(cols[2]),
-                                asier: cleanNum(cols[3]),
-                                revolut: cleanNum(cols[5]),
-                                simulacion: cleanNum(cols[11]) || cleanNum(cols[4])
-                            });
-                        }
-                    });
-
-                    if (parsedMonthly.length > 0) {
-                        setMetaTotal(parsedMeta);
-                        setSaldoInicial(parsedSaldo);
-                        setHouseMetas(parsedMetas);
-                        setContributions(parsedMonthly);
-                        persistData(parsedMonthly, parsedMeta, parsedSaldo, parsedMetas);
-                        addNotification("Importación de CSV completada", "success");
-                    }
-                } catch (err) {
-                    addNotification("Error procesando CSV", "error");
-                }
-            };
+                            <p class="text-[10px] text-slate-500 font-medium">
+                                Esta aplicación está configurada para restringir accesos no autorizados al plan familiar.
+                            </p>
+                        </div>
+                    </div>
+                );
+            }
 
             return (
-                <div class="flex-1 flex flex-col min-h-screen">
+                <div class="flex-1 flex flex-col min-h-screen animate-fadeIn">
                     {/* ENCABEZADO PRÉMIUM */}
                     <header class="bg-slate-900 border-b border-slate-800 py-4 px-6 sticky top-0 z-40 shadow-xl">
                         <div class="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
@@ -923,7 +885,7 @@
                                             <div class="text-3xl font-extrabold text-white">{processedData.saldoRevolutActual.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €</div>
                                             <p class="text-[11px] text-cyan-400 font-semibold mt-2 flex items-center gap-1">
                                                 <span class="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping"></span>
-                                                Saldo actualizado en vivo con intereses
+                                                Saldo actualizado con intereses diarios del {annualInterestRate}%
                                             </p>
                                         </div>
 
@@ -950,34 +912,52 @@
                                         </div>
                                     </div>
 
-                                    {/* SECCIÓN INTERESES Y CORRECTORES EN VIVO */}
+                                    {/* SECCIÓN INTERESES Y AJUSTE DE BALANCE PREMIUM (Saves automatically with button click - No block) */}
                                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        {/* Panel goteo intereses */}
+                                        {/* Panel goteo intereses automatizados al 1.15% */}
                                         <div class="bg-slate-900/60 p-5 rounded-3xl border border-slate-800 space-y-3 relative overflow-hidden group">
                                             <div class="absolute right-0 bottom-0 translate-x-4 translate-y-4 w-24 h-24 bg-emerald-500/5 rounded-full"></div>
                                             <div class="flex justify-between items-start">
-                                                <span class="text-[10px] uppercase font-black tracking-widest text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-md">Intereses Acumulados</span>
-                                                <span class="text-xs font-bold text-slate-400">+{dailyInterestRate.toFixed(2)} €/día</span>
+                                                <span class="text-[10px] uppercase font-black tracking-widest text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-md">Intereses Acumulados Automáticos ({annualInterestRate}% anual)</span>
+                                                <span class="text-[10px] text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded-md">
+                                                    +{processedData.interestPerDay.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €/día
+                                                </span>
                                             </div>
                                             <div class="text-2xl font-black text-white">{processedData.accumulatedInterestRealTime.toLocaleString('es-ES', { minimumFractionDigits: 5, maximumFractionDigits: 5 })} €</div>
                                             <p class="text-[11px] text-slate-400 leading-relaxed">
-                                                Acumulado pasivo de <strong class="text-white">{processedData.diffDays} días</strong> transcurridos desde el último cuadre oficial de vuestro Excel ({reconciliationDate}).
+                                                Interés compuesto diario generado de forma pasiva sobre vuestro saldo base durante <strong class="text-white">{processedData.diffDays} días</strong> (desde el cuadre del {reconciliationDate}).
                                             </p>
                                         </div>
 
-                                        {/* Panel correctivos extraordinarios */}
+                                        {/* Editor rápido de corrector para evitar bloqueos */}
                                         <div class="bg-slate-900/60 p-5 rounded-3xl border border-slate-800 space-y-3 relative overflow-hidden group">
                                             <div class="absolute right-0 bottom-0 translate-x-4 translate-y-4 w-24 h-24 bg-cyan-500/5 rounded-full"></div>
                                             <div class="flex justify-between items-start">
-                                                <span class="text-[10px] uppercase font-black tracking-widest text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded-md">Corrector de Saldo</span>
-                                                <span class="text-[10px] text-slate-500 font-bold">Manual</span>
+                                                <span class="text-[10px] uppercase font-black tracking-widest text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded-md">Ajuste / Corrector de Balance</span>
+                                                <button onClick={saveBalanceAdjustment} class="text-[10px] font-black uppercase tracking-wider text-cyan-400 bg-cyan-500/10 border border-cyan-500/20 px-2.5 py-0.5 rounded-md hover:bg-cyan-500 hover:text-slate-950 transition flex items-center gap-1">
+                                                    {SVGIcons.save} Guardar Ajuste
+                                                </button>
                                             </div>
-                                            <div class="text-2xl font-black text-white">
-                                                {revolutCorrection >= 0 ? `+${revolutCorrection.toLocaleString('es-ES')} €` : `${revolutCorrection.toLocaleString('es-ES')} €`}
+                                            <div class="grid grid-cols-2 gap-2 mt-2">
+                                                <div>
+                                                    <label class="block text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Importe corrector (€)</label>
+                                                    <input 
+                                                        type="text" 
+                                                        class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white text-xs font-bold focus:outline-none focus:border-cyan-500" 
+                                                        value={tempCorrection}
+                                                        onChange={e => setTempCorrection(e.target.value)} 
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label class="block text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Motivo / Explicación</label>
+                                                    <input 
+                                                        type="text" 
+                                                        class="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white text-xs font-semibold focus:outline-none focus:border-cyan-500" 
+                                                        value={tempCorrectionReason}
+                                                        onChange={e => setTempCorrectionReason(e.target.value)} 
+                                                    />
+                                                </div>
                                             </div>
-                                            <p class="text-[11px] text-slate-400 leading-relaxed truncate">
-                                                <strong>Motivo:</strong> {revolutCorrectionReason || "Ningún correctivo aplicado"}
-                                            </p>
                                         </div>
                                     </div>
 
@@ -1004,19 +984,19 @@
                                         </div>
                                     </div>
 
-                                    {/* SECCIÓN 50/50: EQUILIBRIO DE PAREJA */}
+                                    {/* SECCIÓN 50/50: EQUILIBRIO DE PAREJA CON AJUSTE DEL PRIMER 10% DE ENTRADA */}
                                     <div class="bg-slate-900/40 p-6 rounded-3xl border border-slate-800 space-y-6">
                                         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                                             <div>
                                                 <h3 class="text-base font-extrabold text-white flex items-center gap-2">
                                                     <span class="text-indigo-400">{SVGIcons.scale}</span>
-                                                    Acuerdo de Co-Inversión al 50/50
+                                                    Acuerdo de Co-Inversión al 50/50 (Especial Entrada)
                                                 </h3>
                                                 <p class="text-xs text-slate-400">Control estricto para que vuestras aportaciones acumuladas estén siempre en armonía</p>
                                             </div>
 
                                             {/* Badge Dinámico de Compensación */}
-                                            {processedData.totalLaura === processedData.totalAsier ? (
+                                            {processedData.balanceConsolidadoAsierALaura === 0 ? (
                                                 <span class="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-bold px-3 py-1.5 rounded-full">Balance Perfecto</span>
                                             ) : (
                                                 <span class="bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs font-bold px-3 py-1.5 rounded-full">
@@ -1025,35 +1005,98 @@
                                             )}
                                         </div>
 
+                                        {/* Desglose detallado del primer 10% de entrada (Laura 33k vs Asier 10k) */}
+                                        <div class="bg-slate-950/80 p-5 rounded-2xl border border-slate-800/80 space-y-4">
+                                            <h4 class="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+                                                <span class="w-2 h-2 rounded-full bg-amber-400"></span> Ajuste de Entrada del primer 10%
+                                            </h4>
+                                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+                                                <div class="bg-slate-900/40 p-3.5 rounded-xl border border-slate-800">
+                                                    <span class="text-slate-400 font-bold block mb-1"> Laura aportó:</span>
+                                                    <strong class="text-lg font-black text-white">{lauraInitialPayment.toLocaleString('es-ES')} €</strong>
+                                                </div>
+                                                <div class="bg-slate-900/40 p-3.5 rounded-xl border border-slate-800">
+                                                    <span class="text-slate-400 font-bold block mb-1"> Asier aportó:</span>
+                                                    <strong class="text-lg font-black text-white">{asierInitialPayment.toLocaleString('es-ES')} €</strong>
+                                                </div>
+                                                <div class="bg-slate-900/40 p-3.5 rounded-xl border border-slate-800">
+                                                    <span class="text-slate-400 font-bold block mb-1"> Compensación Ideal:</span>
+                                                    <span class="block text-[10px] text-slate-500">Asier debe devolver originalmente a Laura:</span>
+                                                    <strong class="text-lg font-black text-amber-400">{processedData.deudaInicialAsierALaura.toLocaleString('es-ES')} €</strong>
+                                                </div>
+                                            </div>
+
+                                            {/* Repagos poco a poco */}
+                                            <div class="p-4 bg-slate-900/60 rounded-xl border border-slate-850 flex flex-col md:flex-row items-center justify-between gap-4">
+                                                <div class="space-y-1">
+                                                    <span class="text-slate-300 font-extrabold text-xs block">¿Cuánto ha devuelto Asier a Laura poco a poco?</span>
+                                                    <p class="text-[10px] text-slate-500">Registra aquí la suma total que Asier le ha reembolsado ya a Laura directamente de la asimetría inicial.</p>
+                                                </div>
+                                                <div class="flex items-center gap-2 w-full md:w-auto shrink-0">
+                                                    <input 
+                                                        type="text" 
+                                                        class="bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs font-black text-white w-24 text-center focus:outline-none focus:border-cyan-500" 
+                                                        value={tempRepaidAmount}
+                                                        onChange={e => setTempRepaidAmount(e.target.value)}
+                                                    />
+                                                    <button onClick={saveRepaidAmount} class="bg-cyan-600 hover:bg-cyan-500 text-white text-[10px] font-black uppercase px-3 py-2 rounded-lg transition shrink-0 flex items-center gap-1">
+                                                        {SVGIcons.save} Actualizar
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            <div class="flex justify-between items-center text-xs font-bold pt-1">
+                                                <span class="text-slate-400">Deuda por el pago del primer 10% pendiente de amortizar:</span>
+                                                <strong class="text-white bg-slate-900 px-3 py-1.5 rounded-lg border border-slate-800">
+                                                    {processedData.deudaInicialPendiente.toLocaleString('es-ES')} €
+                                                </strong>
+                                            </div>
+                                        </div>
+
+                                        {/* CUENTA MENSUAL REVOLUT ACTUAL */}
                                         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                                             {/* Bloque Laura */}
                                             <div class="bg-slate-900/60 p-5 rounded-2xl border border-slate-800 relative">
                                                 <span class="absolute top-4 right-4 text-xs font-black text-pink-400 bg-pink-500/10 px-2 py-0.5 rounded-md">Laura</span>
-                                                <span class="text-xs font-bold text-slate-400">Total Aportado</span>
+                                                <span class="text-xs font-bold text-slate-400">Ahorro Mensual Acumulado</span>
                                                 <div class="text-2xl font-black text-white mt-1">{processedData.totalLaura.toLocaleString('es-ES')} €</div>
                                                 <div class="mt-4 flex justify-between text-xs text-slate-400">
-                                                    <span>Cuota del total: {((processedData.totalLaura / (processedData.totalLaura + processedData.totalAsier || 1)) * 100).toFixed(1)}%</span>
+                                                    <span>Nóminas mensuales en Revolut: {((processedData.totalLaura / (processedData.totalLaura + processedData.totalAsier || 1)) * 100).toFixed(1)}%</span>
                                                 </div>
                                             </div>
 
                                             {/* Bloque Asier */}
                                             <div class="bg-slate-900/60 p-5 rounded-2xl border border-slate-800 relative">
                                                 <span class="absolute top-4 right-4 text-xs font-black text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded-md">Asier</span>
-                                                <span class="text-xs font-bold text-slate-400">Total Aportado</span>
+                                                <span class="text-xs font-bold text-slate-400">Ahorro Mensual Acumulado</span>
                                                 <div class="text-2xl font-black text-white mt-1">{processedData.totalAsier.toLocaleString('es-ES')} €</div>
                                                 <div class="mt-4 flex justify-between text-xs text-slate-400">
-                                                    <span>Cuota del total: {((processedData.totalAsier / (processedData.totalLaura + processedData.totalAsier || 1)) * 100).toFixed(1)}%</span>
+                                                    <span>Nóminas mensuales en Revolut: {((processedData.totalAsier / (processedData.totalLaura + processedData.totalAsier || 1)) * 100).toFixed(1)}%</span>
                                                 </div>
                                             </div>
                                         </div>
 
-                                        {/* Caja de Compensación Dinámica */}
-                                        {processedData.totalLaura !== processedData.totalAsier && (
-                                            <div class="bg-indigo-500/5 border border-indigo-500/15 p-4 rounded-2xl flex items-center gap-3.5 text-xs">
-                                                <span class="p-2 bg-indigo-500/10 text-indigo-400 rounded-lg shrink-0">{SVGIcons.scale}</span>
-                                                <p class="text-slate-300 leading-relaxed">
-                                                    Para igualar la balanza al 50/50, <strong>{processedData.totalLaura < processedData.totalAsier ? 'Laura' : 'Asier'}</strong> debería ingresar un pago de compensación de <strong class="text-indigo-400 font-extrabold">{(Math.abs(processedData.totalLaura - processedData.totalAsier) / 2).toLocaleString('es-ES', { minimumFractionDigits: 2 })} €</strong> en la cuenta de Revolut o realizar una transferencia directa.
-                                                </p>
+                                        {/* CAJA DE COMPENSACIÓN CONSOLIDADA FINAL (Combines 10% debt + Monthly saving imbalance) */}
+                                        {processedData.balanceConsolidadoAsierALaura !== 0 && (
+                                            <div class="bg-indigo-500/5 border border-indigo-500/15 p-5 rounded-2xl space-y-3 text-xs">
+                                                <div class="flex items-center gap-3.5">
+                                                    <span class="p-2 bg-indigo-500/10 text-indigo-400 rounded-lg shrink-0">{SVGIcons.scale}</span>
+                                                    <div>
+                                                        <h4 class="font-extrabold text-white">Balance Neto Consolidado</h4>
+                                                        <p class="text-slate-400 text-[10px]">Cálculo integrado sumando el desequilibrio mensual de nóminas y la deuda pendiente de la primera entrada.</p>
+                                                    </div>
+                                                </div>
+                                                <div class="bg-slate-950 p-4 rounded-xl border border-slate-900 leading-relaxed text-slate-300">
+                                                    {processedData.balanceConsolidadoAsierALaura > 0 ? (
+                                                        <p>
+                                                            Teniendo en cuenta el historial mensual de Revolut y la diferencia del pago del primer hito, <strong class="text-indigo-400">Asier debe compensar un total neto de <span class="text-sm font-black text-indigo-300">{processedData.balanceConsolidadoAsierALaura.toLocaleString('es-ES', { minimumFractionDigits: 2 })} €</span> a Laura</strong> para estar en balance perfecto al 50/50.
+                                                        </p>
+                                                    ) : (
+                                                        <p>
+                                                            Teniendo en cuenta el historial mensual de Revolut y la diferencia del pago del primer hito, <strong class="text-indigo-400">Laura debe compensar un total neto de <span class="text-sm font-black text-indigo-300">{Math.abs(processedData.balanceConsolidadoAsierALaura).toLocaleString('es-ES', { minimumFractionDigits: 2 })} €</span> a Asier</strong> para estar en balance perfecto al 50/50.
+                                                        </p>
+                                                    )}
+                                                </div>
                                             </div>
                                         )}
                                     </div>
@@ -1154,7 +1197,7 @@
                                 </div>
                             )}
 
-                            {/* PESTAÑA: RINCÓN DE TRANQUILIDAD & LÍNEA TEMPORAL */}
+                            {/* PESTAÑA: RINCÓN DE TRANQUILIDAD */}
                             {currentTab === 'projections' && (
                                 <div class="space-y-6 animate-fadeIn">
                                     <div class="bg-gradient-to-tr from-amber-600/10 via-amber-600/5 to-transparent p-6 rounded-3xl border border-amber-500/20">
@@ -1428,6 +1471,45 @@
                             {/* PESTAÑA: CONFIGURACIÓN Y SINCRONIZACIÓN NUBE */}
                             {currentTab === 'config' && (
                                 <div class="space-y-6 animate-fadeIn">
+                                    {/* Configuración de Aportaciones Iniciales del primer 10% */}
+                                    <div class="bg-slate-900 border border-slate-800 rounded-3xl p-5 space-y-4 shadow-xl">
+                                        <h3 class="font-bold text-white text-sm flex items-center gap-1.5">
+                                            <span class="text-amber-400">{SVGIcons.scale}</span>
+                                            Configuración de Entrada Inicial (Primer 10%)
+                                        </h3>
+                                        <p class="text-xs text-slate-400 leading-relaxed">
+                                            Ajusta los depósitos iniciales para que la asimetría de inversión (Laura: 33.000 € vs. Asier: 10.000 €) quede registrada y se descuente poco a poco con tus devoluciones.
+                                        </p>
+                                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                            <div>
+                                                <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Primer Pago Laura (€)</label>
+                                                <input 
+                                                    type="number" 
+                                                    class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs font-bold text-white focus:outline-none focus:border-cyan-500" 
+                                                    value={lauraInitialPayment}
+                                                    onChange={e => {
+                                                        const val = parseFloat(e.target.value) || 0;
+                                                        setLauraInitialPayment(val);
+                                                        persistData(contributions, metaTotal, saldoInicial, houseMetas, furnitureBudget, revolutCorrection, revolutCorrectionReason, annualInterestRate, reconciliationDate, allowedEmails, familyPin, val);
+                                                    }}
+                                                />
+                                            </div>
+                                            <div>
+                                                <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Primer Pago Asier (€)</label>
+                                                <input 
+                                                    type="number" 
+                                                    class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs font-bold text-white focus:outline-none focus:border-cyan-500" 
+                                                    value={asierInitialPayment}
+                                                    onChange={e => {
+                                                        const val = parseFloat(e.target.value) || 0;
+                                                        setAsierInitialPayment(val);
+                                                        persistData(contributions, metaTotal, saldoInicial, houseMetas, furnitureBudget, revolutCorrection, revolutCorrectionReason, annualInterestRate, reconciliationDate, allowedEmails, familyPin, lauraInitialPayment, val);
+                                                    }}
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+
                                     {/* Panel de Autenticación y Whitelist */}
                                     <div class="bg-slate-900 border border-slate-800 rounded-3xl p-5 space-y-4 shadow-xl">
                                         <h3 class="font-bold text-white text-sm flex items-center gap-1.5">
@@ -1447,7 +1529,7 @@
                                                     onChange={e => {
                                                         const clean = e.target.value.split(',').map(em => em.trim().toLowerCase()).filter(em => em.length > 0);
                                                         setAllowedEmails(clean);
-                                                        persistData(contributions, metaTotal, saldoInicial, houseMetas, furnitureBudget, revolutCorrection, revolutCorrectionReason, dailyInterestRate, reconciliationDate, clean);
+                                                        persistData(contributions, metaTotal, saldoInicial, houseMetas, furnitureBudget, revolutCorrection, revolutCorrectionReason, annualInterestRate, reconciliationDate, clean);
                                                     }} 
                                                 />
                                             </div>
@@ -1459,7 +1541,7 @@
                                                     value={familyPin} 
                                                     onChange={e => {
                                                         setFamilyPin(e.target.value);
-                                                        persistData(contributions, metaTotal, saldoInicial, houseMetas, furnitureBudget, revolutCorrection, revolutCorrectionReason, dailyInterestRate, reconciliationDate, allowedEmails, e.target.value);
+                                                        persistData(contributions, metaTotal, saldoInicial, houseMetas, furnitureBudget, revolutCorrection, revolutCorrectionReason, annualInterestRate, reconciliationDate, allowedEmails, e.target.value);
                                                     }} 
                                                 />
                                             </div>
@@ -1470,65 +1552,43 @@
                                     <div class="bg-slate-900 border border-slate-800 rounded-3xl p-5 space-y-4 shadow-xl">
                                         <h3 class="font-bold text-white text-sm flex items-center gap-1.5">
                                             <span class="text-emerald-400">{SVGIcons.wallet}</span>
-                                            Ajustes de Goteo de Intereses y Conciliación
+                                            Ajustes de Interés del 1.15% Anual de Revolut
                                         </h3>
                                         <p class="text-xs text-slate-400 leading-relaxed">
-                                            Para que la cuenta de Revolut esté 100% automatizada con los céntimos de intereses diarios y descuadres menores, concilia el balance base de vuestro último mes y define el goteo diario:
+                                            Define la tasa de interés anual de vuestra cuenta y la fecha de vuestro último cuadre oficial de saldo de Revolut:
                                         </p>
-                                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                             <div>
-                                                <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Goteo Diario (€/día)</label>
+                                                <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Tasa de Interés Anual (TIN %)</label>
                                                 <input 
                                                     type="number" 
                                                     step="0.01"
                                                     class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs font-bold text-white focus:outline-none focus:border-emerald-500" 
-                                                    value={dailyInterestRate}
+                                                    value={annualInterestRate}
                                                     onChange={e => {
                                                         const val = Number(e.target.value);
-                                                        setDailyInterestRate(val);
+                                                        setAnnualInterestRate(val);
                                                         persistData(contributions, metaTotal, saldoInicial, houseMetas, furnitureBudget, revolutCorrection, revolutCorrectionReason, val);
                                                     }}
                                                 />
                                             </div>
                                             <div>
-                                                <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Fecha de Último Cuadre</label>
+                                                <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Fecha de Última Conciliación</label>
                                                 <input 
                                                     type="date" 
                                                     class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs font-bold text-white focus:outline-none focus:border-emerald-500" 
                                                     value={reconciliationDate}
                                                     onChange={e => {
                                                         setReconciliationDate(e.target.value);
-                                                        persistData(contributions, metaTotal, saldoInicial, houseMetas, furnitureBudget, revolutCorrection, revolutCorrectionReason, dailyInterestRate, e.target.value);
-                                                    }}
-                                                />
-                                            </div>
-                                            <div>
-                                                <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Corrector de Desfase (€)</label>
-                                                <input 
-                                                    type="number" 
-                                                    step="0.01"
-                                                    class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs font-bold text-white focus:outline-none focus:border-emerald-500" 
-                                                    value={revolutCorrection}
-                                                    onChange={e => {
-                                                        const val = Number(e.target.value);
-                                                        setRevolutCorrection(val);
-                                                        persistData(contributions, metaTotal, saldoInicial, houseMetas, furnitureBudget, val);
+                                                        persistData(contributions, metaTotal, saldoInicial, houseMetas, furnitureBudget, revolutCorrection, revolutCorrectionReason, annualInterestRate, e.target.value);
                                                     }}
                                                 />
                                             </div>
                                         </div>
-                                        <div>
-                                            <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Descripción / Motivo del Correctivo</label>
-                                            <input 
-                                                type="text" 
-                                                placeholder="Ej: Redondeos acumulados y pico de cuenta conjunta..."
-                                                class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs font-semibold text-white focus:outline-none focus:border-emerald-500" 
-                                                value={revolutCorrectionReason}
-                                                onChange={e => {
-                                                    setRevolutCorrectionReason(e.target.value);
-                                                    persistData(contributions, metaTotal, saldoInicial, houseMetas, furnitureBudget, revolutCorrection, e.target.value);
-                                                }}
-                                            />
+                                        
+                                        <div class="bg-slate-950 p-4 rounded-xl border border-slate-900 text-xs text-slate-400 space-y-2">
+                                            <p class="font-bold text-white">¿Cómo funciona la automatización?</p>
+                                            <p>El sistema calcula cuántos días han pasado desde la fecha de vuestro último cuadre hasta el día de hoy, y le aplica un interés compuesto diario del <strong>{(annualInterestRate/365).toFixed(5)}% al día</strong> de forma transparente sobre vuestro capital. De esta forma, el saldo que veis en la app estará siempre en perfecta armonía con vuestra cuenta real de Revolut sin tocar nada.</p>
                                         </div>
                                     </div>
 
@@ -1561,7 +1621,7 @@
                                             </div>
 
                                             {/* Paso 3: Estado de Datos */}
-                                            <div class="flex items-center justify-between p-2.5 bg-slate-950 rounded-xl border border-slate-900">
+                                            <div class="flex items-center justify-between p-2.5 bg-slate-950 rounded-xl border border-slate-800 flex items-center justify-between">
                                                 <span class="text-slate-400 font-medium">3. Sincronización en Tiempo Real</span>
                                                 {firebaseStatus === 'connected' ? (
                                                     <span class="text-emerald-400 font-bold flex items-center gap-1">✓ Activo (Nube)</span>
@@ -1737,7 +1797,6 @@
             };
 
             // Posición de hoy (12 de junio de 2026)
-            // Marzo 2026 a Septiembre 2028 es 944 días. Hoy es el día 104.
             const todayPercentage = 11.0; 
 
             // Hitos con sus porcentajes y metadatos
