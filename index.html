@@ -53,6 +53,13 @@
         .animate-fadeIn {
             animation: fadeIn 0.4s ease-out forwards;
         }
+        @keyframes pulseGlow {
+            0%, 100% { transform: scale(1); opacity: 0.4; }
+            50% { transform: scale(1.15); opacity: 0.8; }
+        }
+        .glowing-ring {
+            animation: pulseGlow 2s infinite ease-in-out;
+        }
     </style>
     
     <!-- React & Babel CDNs -->
@@ -60,7 +67,7 @@
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-    <!-- Firebase Compat SDKs (Máxima estabilidad para apps monofichero sin importar dinámicos) -->
+    <!-- Firebase Compat SDKs (Máxima estabilidad para apps de un solo fichero) -->
     <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore-compat.js"></script>
@@ -81,7 +88,7 @@
         const DEFAULT_META_TOTAL = 66629.20;
         const DEFAULT_METAS = [
             { id: 'm1', label: '10% Entrada Piso', amount: 34870, completed: false, desc: 'Primer hito de reserva y firma de contrato (Ya pagado 10%, pendiente el otro 10%)' },
-            { id: 'm2', label: 'IVA & Gastos de Compra', amount: 27896, completed: false, desc: 'Gastos de gestoría, notaría e impuestos correspondientes' },
+            { id: 'm2', label: 'IVA & Gastos de Compra', amount: 27896, completed: false, desc: 'Gastos de gestoría, notaría e impuestos correspondientes (No financiados por hipoteca)' },
             { id: 'm3', label: 'Personalización de Vivienda', amount: 3863.20, completed: false, desc: 'Mejoras y adaptaciones de acabados de la constructora' }
         ];
         const DEFAULT_SALDO_INICIAL = 8164.00;
@@ -131,7 +138,7 @@
             appId: "1:655569001492:web:968b5c5fe7f418927e5b01"
         };
 
-        // --- ICONOS VECTORIALES SVG PARA PREVENIR ERRORES DE CARGA ---
+        // --- ICONOS VECTORIALES SVG PARA EVITAR DEPENDENCIAS EXTERNAS ---
         const SVGIcons = {
             home: <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor" class="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25" /></svg>,
             wallet: <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor" class="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M21 12a2.25 2.25 0 00-2.25-2.25H15a3 3 0 11-6 0H5.25A2.25 2.25 0 003 12m18 0v6a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 18v-6m18 0V9M3 12V9m18-3a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 003 6v3h18V6z" /></svg>,
@@ -141,11 +148,13 @@
             trash: <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor" class="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" /></svg>,
             edit: <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor" class="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" /></svg>,
             save: <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor" class="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
-            settings: <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor" class="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.43l-1.003.828c-.293.241-.438.613-.43.992a7.723 7.723 0 010 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.43l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.991l-1.004-.827a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.28z" /><circle cx="12" cy="12" r="3" strokeLinecap="round" strokeLinejoin="round" /></svg>
+            settings: <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor" class="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.43l-1.003.828c-.293.241-.438.613-.43.992a7.723 7.723 0 010 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.43l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.991l-1.004-.827a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.28z" /><circle cx="12" cy="12" r="3" strokeLinecap="round" strokeLinejoin="round" /></svg>,
+            lock: <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor" class="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" /></svg>,
+            google: <svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.18 1-.78 1.85-1.63 2.42v2.77h2.64c1.63-1.5 2.56-3.7 2.56-6.3V12.25z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H3.18v2.84C5 20.53 8.26 23 12 23z" fill="#34A853"/><path d="M5.84 14.1c-.22-.66-.35-1.36-.35-2.1s.13-1.44.35-2.1V7.06H3.18C2.42 8.64 2 10.27 2 12s.42 3.36 1.18 4.94l3.1-2.42c-.2-.42-.34-.89-.44-1.42z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 8.26 1 5 3.47 3.18 7.06l3.48 2.84c.87-2.6 3.3-4.52 6.16-4.52z" fill="#EA4335"/></svg>
         };
 
         function App() {
-            // Estados principales
+            // --- ESTADOS DE CONTROL Y CONFIGURACIÓN ---
             const [currentTab, setCurrentTab] = useState('dashboard');
             const [metaTotal, setMetaTotal] = useState(DEFAULT_META_TOTAL);
             const [saldoInicial, setSaldoInicial] = useState(DEFAULT_SALDO_INICIAL);
@@ -153,7 +162,23 @@
             const [houseMetas, setHouseMetas] = useState(DEFAULT_METAS);
             const [furnitureBudget, setFurnitureBudget] = useState(DEFAULT_FURNITURE_BUDGET);
             
-            // Proyección dinámica slider (Ahorro objetivo mensual conjunto)
+            // Corrector e Interés diario de Revolut
+            const [revolutCorrection, setRevolutCorrection] = useState(1324.50); // Ajuste inicial de vuestro saldo real acumulado
+            const [revolutCorrectionReason, setRevolutCorrectionReason] = useState("Redondeos acumulados y céntimos extra de Revolut");
+            const [dailyInterestRate, setDailyInterestRate] = useState(0.08); // 8 céntimos/día
+            const [reconciliationDate, setReconciliationDate] = useState("2026-06-01"); // Fecha de partida para el conteo de días
+            const [liveSeconds, setLiveSeconds] = useState(0); 
+
+            // Autenticación de usuarios
+            const [user, setUser] = useState(null);
+            const [userEmail, setUserEmail] = useState("");
+            const [allowedEmails, setAllowedEmails] = useState(["asier@gmail.com", "laura@gmail.com"]);
+            const [familyPin, setFamilyPin] = useState("1234");
+            const [isAuthenticated, setIsAuthenticated] = useState(false);
+            const [loginPinInput, setLoginPinInput] = useState("");
+            const [loginError, setLoginError] = useState("");
+
+            // Proyección dinámica
             const [targetMonthlySaving, setTargetMonthlySaving] = useState(2300);
 
             // Simulación Hipoteca
@@ -167,6 +192,7 @@
             });
             const [firebaseStatus, setFirebaseStatus] = useState('demo');
             const [firebaseConfigForm, setFirebaseConfigForm] = useState(DEFAULT_FIREBASE_CREDENTIALS);
+            const [firebaseError, setFirebaseError] = useState(null);
 
             // Notificaciones
             const [notifications, setNotifications] = useState([]);
@@ -180,6 +206,14 @@
 
             const dbRef = useRef(null);
             const syncUnsubscribe = useRef(null);
+
+            // Reloj para actualización pasiva de intereses en "tiempo real"
+            useEffect(() => {
+                const interval = setInterval(() => {
+                    setLiveSeconds(prev => prev + 1);
+                }, 1000);
+                return () => clearInterval(interval);
+            }, []);
 
             // Cargar datos locales o conectar a Firebase automáticamente al inicio
             useEffect(() => {
@@ -200,30 +234,37 @@
                 const localSaldo = localStorage.getItem('casa_local_saldo');
                 const localMetas = localStorage.getItem('casa_local_metas');
                 const localFurniture = localStorage.getItem('casa_local_furniture');
+                
+                const localCorr = localStorage.getItem('casa_local_revolut_correction');
+                const localReason = localStorage.getItem('casa_local_revolut_reason');
+                const localIntRate = localStorage.getItem('casa_local_revolut_intrate');
+                const localRecDate = localStorage.getItem('casa_local_revolut_recdate');
+                const localEmails = localStorage.getItem('casa_local_allowed_emails');
+                const localPin = localStorage.getItem('casa_local_family_pin');
+
                 if (localData) setContributions(JSON.parse(localData));
                 if (localMeta) setMetaTotal(parseFloat(localMeta));
                 if (localSaldo) setSaldoInicial(parseFloat(localSaldo));
                 if (localMetas) setHouseMetas(JSON.parse(localMetas));
                 if (localFurniture) setFurnitureBudget(JSON.parse(localFurniture));
-            };
 
-            // Disparar renderizado de LaTeX cada vez que cambiamos de pestaña o de datos
-            useEffect(() => {
-                if (window.MathJax && window.MathJax.typesetPromise) {
-                    window.MathJax.typesetPromise().catch((err) => console.log(err));
-                }
-            }, [currentTab, interestRate, loanTermYears, targetMonthlySaving]);
+                if (localCorr) setRevolutCorrection(parseFloat(localCorr));
+                if (localReason) setRevolutCorrectionReason(localReason);
+                if (localIntRate) setDailyInterestRate(parseFloat(localIntRate));
+                if (localRecDate) setReconciliationDate(localRecDate);
+                if (localEmails) setAllowedEmails(JSON.parse(localEmails));
+                if (localPin) setFamilyPin(localPin);
+            };
 
             // Conexión a Firebase utilizando el SDK compatible para evitar fallos de compilación dinámicos
             const connectFirebase = async (config) => {
                 setFirebaseStatus('connecting');
+                setFirebaseError(null);
                 try {
-                    // Verificar que las librerías globales de Firebase están listas
                     if (typeof firebase === 'undefined') {
-                        throw new Error('Librerías de Firebase no cargadas aún');
+                        throw new Error('Las librerías de Firebase no están cargadas aún.');
                     }
 
-                    // Evitar duplicidades de inicialización
                     let app;
                     if (!firebase.apps.length) {
                         app = firebase.initializeApp(config);
@@ -235,79 +276,112 @@
                     const db = firebase.firestore();
                     dbRef.current = db;
 
-                    // REGLA 3: Autenticación anónima inmediata
-                    const userCredential = await auth.signInAnonymously();
-                    const user = userCredential.user;
-
-                    if (user) {
-                        setFirebaseStatus('connected');
-                        addNotification("Sincronizado con vuestro Firebase Firestore", "success");
-                        
-                        // REGLA 1: Usar rutas de almacenamiento estrictas
-                        const appIdSlug = config.projectId || 'housecontrol-2bace';
-                        const pathConfig = db.collection('artifacts').doc(appIdSlug).collection('public').doc('data').collection('config').doc('meta_config');
-                        
-                        // Escuchar configuraciones de la meta de ahorro
-                        pathConfig.onSnapshot((docSnap) => {
-                            if (!auth.currentUser) return; // Guard de autenticación
-                            if (docSnap.exists) {
-                                const data = docSnap.data();
-                                if (data.metaTotal) setMetaTotal(data.metaTotal);
-                                if (data.saldoInicial) setSaldoInicial(data.saldoInicial);
-                                if (data.houseMetas) setHouseMetas(data.houseMetas);
-                                if (data.furnitureBudget) setFurnitureBudget(data.furnitureBudget);
+                    // Escuchar estado de autenticación de Firebase
+                    auth.onAuthStateChanged((firebaseUser) => {
+                        if (firebaseUser) {
+                            if (firebaseUser.email) {
+                                if (allowedEmails.includes(firebaseUser.email.toLowerCase())) {
+                                    setUser(firebaseUser);
+                                    setUserEmail(firebaseUser.email);
+                                    setIsAuthenticated(true);
+                                    setFirebaseStatus('connected');
+                                } else {
+                                    setLoginError(`El email ${firebaseUser.email} no está en la lista de autorizados.`);
+                                    auth.signOut();
+                                    setIsAuthenticated(false);
+                                    setUser(null);
+                                }
+                            } else {
+                                setUser(firebaseUser);
+                                setIsAuthenticated(true);
+                                setFirebaseStatus('connected');
                             }
-                        }, (error) => {
-                            console.warn("Fallo al leer config de Firestore, usando locales");
-                        });
+                        } else {
+                            setUser(null);
+                            setIsAuthenticated(false);
+                        }
+                    });
 
-                        // REGLA 2: Consultar la colección completa sin filtros complejos
-                        const contribCollection = db.collection('artifacts').doc(appIdSlug).collection('public').doc('data').collection('contributions');
-                        if (syncUnsubscribe.current) syncUnsubscribe.current();
-                        
-                        syncUnsubscribe.current = contribCollection.onSnapshot((querySnap) => {
-                            if (!auth.currentUser) return; // Guard de autenticación
-                            const list = [];
-                            querySnap.forEach((doc) => {
-                                list.push({ id: doc.id, ...doc.data() });
-                            });
-                            if (list.length > 0) {
-                                // Ordenar en memoria local
-                                list.sort((a, b) => (a.order || 0) - (b.order || 0));
-                                setContributions(list);
-                            }
-                        }, (err) => {
-                            console.error("Error en Snapshot de contribuciones:", err);
+                    // REGLA 1: Usar rutas de almacenamiento estrictas para config general
+                    const appIdSlug = config.projectId || 'housecontrol-2bace';
+                    const pathConfig = db.collection('artifacts').doc(appIdSlug).collection('public').doc('data').collection('config').doc('meta_config');
+                    
+                    pathConfig.onSnapshot((docSnap) => {
+                        if (docSnap.exists) {
+                            const data = docSnap.data();
+                            if (data.metaTotal) setMetaTotal(data.metaTotal);
+                            if (data.saldoInicial) setSaldoInicial(data.saldoInicial);
+                            if (data.houseMetas) setHouseMetas(data.houseMetas);
+                            if (data.furnitureBudget) setFurnitureBudget(data.furnitureBudget);
+                            if (data.revolutCorrection !== undefined) setRevolutCorrection(data.revolutCorrection);
+                            if (data.revolutCorrectionReason !== undefined) setRevolutCorrectionReason(data.revolutCorrectionReason);
+                            if (data.dailyInterestRate !== undefined) setDailyInterestRate(data.dailyInterestRate);
+                            if (data.reconciliationDate !== undefined) setReconciliationDate(data.reconciliationDate);
+                            if (data.allowedEmails !== undefined) setAllowedEmails(data.allowedEmails);
+                            if (data.familyPin !== undefined) setFamilyPin(data.familyPin);
+                        }
+                    }, (error) => {
+                        console.warn("Fallo al leer config de Firestore, usando locales", error);
+                    });
+
+                    // REGLA 2: Consultar la colección completa sin filtros complejos
+                    const contribCollection = db.collection('artifacts').doc(appIdSlug).collection('public').doc('data').collection('contributions');
+                    if (syncUnsubscribe.current) syncUnsubscribe.current();
+                    
+                    syncUnsubscribe.current = contribCollection.onSnapshot((querySnap) => {
+                        const list = [];
+                        querySnap.forEach((doc) => {
+                            list.push({ id: doc.id, ...doc.data() });
                         });
-                    }
+                        if (list.length > 0) {
+                            list.sort((a, b) => (a.order || 0) - (b.order || 0));
+                            setContributions(list);
+                        }
+                    }, (err) => {
+                        console.error("Error en Snapshot de contribuciones:", err);
+                        setFirebaseError("Firestore bloqueado. Activa el 'Modo de prueba' en las Reglas de tu base de datos.");
+                    });
+
                 } catch (error) {
                     console.error("Error al inicializar Firebase SDK:", error);
                     setFirebaseStatus('error');
+                    setFirebaseError(error.message || String(error));
                     loadLocalStorageData();
                     addNotification("Error conectando a Firebase, utilizando almacenamiento local seguro", "error");
                 }
             };
 
-            const persistData = async (updatedContribs, updatedMeta, updatedSaldo, updatedMetas, updatedFurniture) => {
+            const persistData = async (updatedContribs, updatedMeta, updatedSaldo, updatedMetas, updatedFurniture, updatedCorr, updatedReason, updatedIntRate, updatedRecDate, updatedEmails, updatedPin) => {
                 const mTotal = updatedMeta !== undefined ? updatedMeta : metaTotal;
                 const sInicial = updatedSaldo !== undefined ? updatedSaldo : saldoInicial;
                 const listContribs = updatedContribs !== undefined ? updatedContribs : contributions;
                 const hMetas = updatedMetas !== undefined ? updatedMetas : houseMetas;
                 const fBudget = updatedFurniture !== undefined ? updatedFurniture : furnitureBudget;
+                
+                const rCorr = updatedCorr !== undefined ? updatedCorr : revolutCorrection;
+                const rReason = updatedReason !== undefined ? updatedReason : revolutCorrectionReason;
+                const dRate = updatedIntRate !== undefined ? updatedIntRate : dailyInterestRate;
+                const rDate = updatedRecDate !== undefined ? updatedRecDate : reconciliationDate;
+                const aEmails = updatedEmails !== undefined ? updatedEmails : allowedEmails;
+                const fPin = updatedPin !== undefined ? updatedPin : familyPin;
 
                 if (firebaseStatus === 'connected' && dbRef.current) {
                     try {
                         const appIdSlug = firebaseConfig.projectId || 'housecontrol-2bace';
                         
-                        // Guardar configuración y muebles
                         await dbRef.current.collection('artifacts').doc(appIdSlug).collection('public').doc('data').collection('config').doc('meta_config').set({
                             metaTotal: mTotal,
                             saldoInicial: sInicial,
                             houseMetas: hMetas,
-                            furnitureBudget: fBudget
+                            furnitureBudget: fBudget,
+                            revolutCorrection: rCorr,
+                            revolutCorrectionReason: rReason,
+                            dailyInterestRate: dRate,
+                            reconciliationDate: rDate,
+                            allowedEmails: aEmails,
+                            familyPin: fPin
                         });
 
-                        // Guardar aportaciones mensuales históricas
                         for (let i = 0; i < listContribs.length; i++) {
                             const month = listContribs[i];
                             await dbRef.current.collection('artifacts').doc(appIdSlug).collection('public').doc('data').collection('contributions').doc(month.id).set({
@@ -328,10 +402,87 @@
                     localStorage.setItem('casa_local_saldo', sInicial.toString());
                     localStorage.setItem('casa_local_metas', JSON.stringify(hMetas));
                     localStorage.setItem('casa_local_furniture', JSON.stringify(fBudget));
+
+                    localStorage.setItem('casa_local_revolut_correction', rCorr.toString());
+                    localStorage.setItem('casa_local_revolut_reason', rReason);
+                    localStorage.setItem('casa_local_revolut_intrate', dRate.toString());
+                    localStorage.setItem('casa_local_revolut_recdate', rDate);
+                    localStorage.setItem('casa_local_allowed_emails', JSON.stringify(aEmails));
+                    localStorage.setItem('casa_local_family_pin', fPin);
                 }
             };
 
-            // --- CÁLCULOS DINÁMICOS DE APORTACIONES ---
+            // Login por Google
+            const loginWithGoogle = () => {
+                setLoginError("");
+                if (typeof firebase === 'undefined') {
+                    setLoginError("Las librerías de Firebase no están listas.");
+                    return;
+                }
+                const provider = new firebase.auth.GoogleAuthProvider();
+                firebase.auth().signInWithPopup(provider)
+                    .then((result) => {
+                        const email = result.user.email ? result.user.email.toLowerCase() : "";
+                        if (allowedEmails.includes(email)) {
+                            setUser(result.user);
+                            setUserEmail(result.user.email);
+                            setIsAuthenticated(true);
+                            addNotification(`¡Bienvenido/a, ${result.user.displayName || 'Pareja'}!`);
+                        } else {
+                            setLoginError(`El email ${result.user.email} no está autorizado.`);
+                            firebase.auth().signOut();
+                            setIsAuthenticated(false);
+                            setUser(null);
+                        }
+                    })
+                    .catch((err) => {
+                        console.error(err);
+                        setLoginError(`Fallo al iniciar sesión: ${err.message}. Recuerda activar el inicio de sesión por Google en tu consola Firebase.`);
+                    });
+            };
+
+            // Login por PIN
+            const handlePinLogin = (e) => {
+                e.preventDefault();
+                setLoginError("");
+                if (loginPinInput === familyPin) {
+                    setIsAuthenticated(true);
+                    addNotification("Acceso autorizado con éxito");
+                    if (firebaseStatus !== 'connected' && dbRef.current) {
+                        firebase.auth().signInAnonymously().catch(err => console.log("Anónimo omitido:", err));
+                    }
+                } else {
+                    setLoginError("PIN incorrecto. Vuelve a intentarlo.");
+                }
+            };
+
+            const logout = () => {
+                if (typeof firebase !== 'undefined' && firebase.auth) {
+                    firebase.auth().signOut();
+                }
+                setUser(null);
+                setIsAuthenticated(false);
+                setLoginPinInput("");
+                setLoginError("");
+                addNotification("Sesión cerrada", "info");
+            };
+
+            const uploadCurrentDataToFirebase = async () => {
+                if (!dbRef.current) {
+                    addNotification("No conectado a Firebase.", "error");
+                    return;
+                }
+                try {
+                    addNotification("Sincronizando datos con la Nube...", "info");
+                    await persistData(contributions, metaTotal, saldoInicial, houseMetas, furnitureBudget);
+                    addNotification("¡Todos tus datos han sido sincronizados y guardados en Firebase!", "success");
+                } catch (err) {
+                    console.error("Error al inicializar base de datos:", err);
+                    addNotification("Error al escribir datos. Revisa las reglas de seguridad de Firestore.", "error");
+                }
+            };
+
+            // --- CÁLCULOS DINÁMICOS DE APORTACIONES E INTERESES ---
             const processedData = useMemo(() => {
                 let currentAccumulated = saldoInicial;
                 let totalLaura = 0;
@@ -364,9 +515,20 @@
 
                 const totalAhorrado = currentAccumulated;
                 const porcentajeProgreso = Math.min(100, (totalAhorrado / metaTotal) * 100);
-                const saldoRevolutActual = contributions.length > 0 ? Number(contributions[contributions.length - 1].revolut) : saldoInicial;
+                
+                const lastMonthRevolutBase = contributions.length > 0 ? Number(contributions[contributions.length - 1].revolut) : saldoInicial;
 
-                // Cálculos del fondo de muebles
+                // Calcular intereses acumulados desde el día de la conciliación hasta HOY
+                const lastDate = new Date(reconciliationDate || "2026-06-01");
+                const today = new Date();
+                const diffTime = Math.max(0, today - lastDate);
+                const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+                const accumulatedInterestRealTime = diffDays * dailyInterestRate;
+
+                // Saldo Revolut final aplicando intereses diarios y correctivo manual
+                const saldoRevolutActual = lastMonthRevolutBase + revolutCorrection + accumulatedInterestRealTime;
+
+                // Muebles
                 const totalMueblesPresupuesto = furnitureBudget.reduce((sum, item) => sum + item.amount, 0);
                 const totalMueblesGastado = furnitureBudget.reduce((sum, item) => sum + item.spent, 0);
 
@@ -376,12 +538,15 @@
                     porcentajeProgreso,
                     totalLaura,
                     totalAsier,
+                    lastMonthRevolutBase,
+                    accumulatedInterestRealTime,
+                    diffDays,
                     saldoRevolutActual,
                     totalSimulacion,
                     totalMueblesPresupuesto,
                     totalMueblesGastado
                 };
-            }, [contributions, metaTotal, saldoInicial, furnitureBudget]);
+            }, [contributions, metaTotal, saldoInicial, furnitureBudget, reconciliationDate, dailyInterestRate, revolutCorrection, liveSeconds]);
 
             // --- PROYECCIONES DE TIEMPO Y CONSEJOS ---
             const projections = useMemo(() => {
@@ -389,7 +554,6 @@
                 const restanteMuebles = Math.max(0, processedData.totalMueblesPresupuesto - processedData.totalMueblesGastado);
                 const totalRestanteProyectoCompleto = restanteCasa + restanteMuebles;
 
-                // Promedio de ahorro real actual (últimos 3 meses como velocidad histórica)
                 let actualMonthlyVelocity = 2300; 
                 if (contributions.length >= 3) {
                     const last3 = contributions.slice(-3);
@@ -646,40 +810,39 @@
                     <header class="bg-slate-900 border-b border-slate-800 py-4 px-6 sticky top-0 z-40 shadow-xl">
                         <div class="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
                             <div class="flex items-center gap-4">
-                                <div class="p-3 bg-gradient-to-tr from-cyan-600 to-indigo-500 rounded-2xl shadow-lg shadow-indigo-500/20 text-white">
+                                <div class="p-3 bg-gradient-to-tr from-cyan-600 to-indigo-500 rounded-2xl shadow-lg shadow-indigo-500/20 text-white animate-fadeIn">
                                     {SVGIcons.home}
                                 </div>
                                 <div>
                                     <h1 class="text-xl font-extrabold tracking-tight text-white flex items-center gap-2">
-                                        Nuestra Casa <span class="text-[10px] uppercase font-black tracking-widest bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 px-2 py-0.5 rounded-md">Live Sandbox</span>
+                                        Nuestra Casa <span class="text-[10px] uppercase font-black tracking-widest bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 px-2 py-0.5 rounded-md">Protected</span>
                                     </h1>
-                                    <p class="text-xs text-slate-400">Panel financiero inteligente para el control del ahorro y amueblado conjunto</p>
+                                    <p class="text-xs text-slate-400">Panel financiero inteligente de Laura & Asier</p>
                                 </div>
                             </div>
 
-                            {/* ESTADOS DE SINCRONIZACIÓN */}
+                            {/* ESTADOS DE SINCRONIZACIÓN Y USUARIO */}
                             <div class="flex flex-wrap items-center gap-3">
                                 {firebaseStatus === 'connected' ? (
                                     <span class="flex items-center gap-1.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 px-3 py-1.5 rounded-xl text-xs font-bold animate-fadeIn">
                                         <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                                        Conectado a Firebase: housecontrol-2bace
-                                    </span>
-                                ) : firebaseStatus === 'connecting' ? (
-                                    <span class="flex items-center gap-1.5 bg-amber-500/10 border border-amber-500/20 text-amber-400 px-3 py-1.5 rounded-xl text-xs font-bold animate-fadeIn">
-                                        <span class="w-2 h-2 rounded-full bg-amber-500 animate-spin"></span>
-                                        Sincronizando...
+                                        Nube Activa (housecontrol-2bace)
                                     </span>
                                 ) : (
                                     <span class="flex items-center gap-1.5 bg-rose-500/10 border border-rose-500/20 text-rose-400 px-3 py-1.5 rounded-xl text-xs font-bold animate-fadeIn">
-                                        <span class="w-2 h-2 rounded-full bg-rose-500"></span>
-                                        Base de datos desconectada (Local)
+                                        <span class="w-2 h-2 rounded-full bg-rose-500 animate-pulse"></span>
+                                        Almacenamiento Local Seguro
                                     </span>
                                 )}
+
+                                <button onClick={logout} class="bg-slate-800 hover:bg-slate-750 border border-slate-700 text-slate-300 text-xs px-3.5 py-1.5 rounded-xl font-bold transition flex items-center gap-1">
+                                    Cerrar Sesión
+                                </button>
                             </div>
                         </div>
                     </header>
 
-                    {/* BANNER DE NOTIFICACIONES */}
+                    {/* PIE DE NOTIFICACIONES */}
                     <div class="fixed bottom-6 right-6 z-50 flex flex-col gap-2 max-w-sm">
                         {notifications.map(n => (
                             <div key={n.id} class={`flex items-center gap-2.5 p-3.5 rounded-2xl shadow-2xl border text-sm font-semibold animate-fadeIn ${
@@ -739,7 +902,7 @@
                             </button>
                             <button onClick={() => setCurrentTab('config')} class={`flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-bold uppercase tracking-wider transition shrink-0 ${currentTab === 'config' ? 'bg-slate-800 border border-slate-700 text-slate-200' : 'hover:bg-slate-900 text-slate-500'}`}>
                                 {SVGIcons.settings}
-                                Configuración Nube
+                                Ajustes Nube & Auth
                             </button>
                         </div>
 
@@ -757,10 +920,10 @@
                                                 <span class="text-xs font-bold text-slate-400 uppercase tracking-widest">Saldo Real Revolut</span>
                                                 <div class="p-2 bg-cyan-500/10 text-cyan-400 rounded-xl">{SVGIcons.wallet}</div>
                                             </div>
-                                            <div class="text-3xl font-extrabold text-white">{processedData.saldoRevolutActual.toLocaleString('es-ES', { minimumFractionDigits: 2 })} €</div>
+                                            <div class="text-3xl font-extrabold text-white">{processedData.saldoRevolutActual.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €</div>
                                             <p class="text-[11px] text-cyan-400 font-semibold mt-2 flex items-center gap-1">
                                                 <span class="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping"></span>
-                                                Total acumulado en cuenta conjunta
+                                                Saldo actualizado en vivo con intereses
                                             </p>
                                         </div>
 
@@ -782,8 +945,39 @@
                                                 <span class="text-xs font-bold text-slate-400 uppercase tracking-widest">Presupuesto Muebles</span>
                                                 <div class="p-2 bg-pink-500/10 text-pink-400 rounded-xl">{SVGIcons.home}</div>
                                             </div>
-                                            <div class="text-3xl font-extrabold text-white">{processedData.totalMueblesPresupuesto.toLocaleString('es-ES')} €</div>
+                                            <div class="text-3xl font-extrabold text-white">{(processedData.totalMueblesPresupuesto - processedData.totalMueblesGastado).toLocaleString('es-ES')} €</div>
                                             <p class="text-[11px] text-pink-400 font-semibold mt-2">Ya pagado: {processedData.totalMueblesGastado.toLocaleString('es-ES')} €</p>
+                                        </div>
+                                    </div>
+
+                                    {/* SECCIÓN INTERESES Y CORRECTORES EN VIVO */}
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        {/* Panel goteo intereses */}
+                                        <div class="bg-slate-900/60 p-5 rounded-3xl border border-slate-800 space-y-3 relative overflow-hidden group">
+                                            <div class="absolute right-0 bottom-0 translate-x-4 translate-y-4 w-24 h-24 bg-emerald-500/5 rounded-full"></div>
+                                            <div class="flex justify-between items-start">
+                                                <span class="text-[10px] uppercase font-black tracking-widest text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-md">Intereses Acumulados</span>
+                                                <span class="text-xs font-bold text-slate-400">+{dailyInterestRate.toFixed(2)} €/día</span>
+                                            </div>
+                                            <div class="text-2xl font-black text-white">{processedData.accumulatedInterestRealTime.toLocaleString('es-ES', { minimumFractionDigits: 5, maximumFractionDigits: 5 })} €</div>
+                                            <p class="text-[11px] text-slate-400 leading-relaxed">
+                                                Acumulado pasivo de <strong class="text-white">{processedData.diffDays} días</strong> transcurridos desde el último cuadre oficial de vuestro Excel ({reconciliationDate}).
+                                            </p>
+                                        </div>
+
+                                        {/* Panel correctivos extraordinarios */}
+                                        <div class="bg-slate-900/60 p-5 rounded-3xl border border-slate-800 space-y-3 relative overflow-hidden group">
+                                            <div class="absolute right-0 bottom-0 translate-x-4 translate-y-4 w-24 h-24 bg-cyan-500/5 rounded-full"></div>
+                                            <div class="flex justify-between items-start">
+                                                <span class="text-[10px] uppercase font-black tracking-widest text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded-md">Corrector de Saldo</span>
+                                                <span class="text-[10px] text-slate-500 font-bold">Manual</span>
+                                            </div>
+                                            <div class="text-2xl font-black text-white">
+                                                {revolutCorrection >= 0 ? `+${revolutCorrection.toLocaleString('es-ES')} €` : `${revolutCorrection.toLocaleString('es-ES')} €`}
+                                            </div>
+                                            <p class="text-[11px] text-slate-400 leading-relaxed truncate">
+                                                <strong>Motivo:</strong> {revolutCorrectionReason || "Ningún correctivo aplicado"}
+                                            </p>
                                         </div>
                                     </div>
 
@@ -804,7 +998,7 @@
                                             </div>
                                         </div>
 
-                                        {/* Gráfico SVG Programado Nativo en React (100% libre de cuelgues) */}
+                                        {/* Gráfico SVG Programado Nativo en React */}
                                         <div class="w-full bg-slate-950/60 p-4 rounded-2xl border border-slate-800/80">
                                             <ResponsiveSVGChart rows={processedData.rows} metaTotal={metaTotal} />
                                         </div>
@@ -960,7 +1154,7 @@
                                 </div>
                             )}
 
-                            {/* PESTAÑA: RINCÓN DE TRANQUILIDAD */}
+                            {/* PESTAÑA: RINCÓN DE TRANQUILIDAD & LÍNEA TEMPORAL */}
                             {currentTab === 'projections' && (
                                 <div class="space-y-6 animate-fadeIn">
                                     <div class="bg-gradient-to-tr from-amber-600/10 via-amber-600/5 to-transparent p-6 rounded-3xl border border-amber-500/20">
@@ -968,8 +1162,36 @@
                                             <div class="p-2.5 bg-amber-500/15 text-amber-400 rounded-2xl">{SVGIcons.hourglass}</div>
                                             <div>
                                                 <h2 class="text-lg font-black text-white">El Rincón de la Tranquilidad</h2>
-                                                <p class="text-xs text-slate-400">Vuestra herramienta interactiva para estimar cuándo podréis firmar las escrituras con plena paz mental</p>
+                                                <p class="text-xs text-slate-400">Proyección de ahorro y cumplimiento de plazos para la firma de hipoteca en el Q3 de 2028</p>
                                             </div>
+                                        </div>
+                                    </div>
+
+                                    {/* LÍNEA TEMPORAL VISUAL CON MONIGOTE */}
+                                    <div class="bg-slate-900/60 p-6 rounded-3xl border border-slate-800 space-y-6">
+                                        <div class="flex justify-between items-center">
+                                            <div>
+                                                <h3 class="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+                                                    <span class="inline-block w-2.5 h-2.5 rounded-full bg-cyan-400 animate-ping"></span>
+                                                    Cronología del Proyecto de Ahorro
+                                                </h3>
+                                                <p class="text-[11px] text-slate-400">Desde marzo de 2026 hasta el límite de firma en septiembre de 2028</p>
+                                            </div>
+                                            <span class="text-[10px] uppercase font-black tracking-widest text-slate-400 bg-slate-950/80 px-2.5 py-1 rounded-md border border-slate-800">
+                                                Fecha Límite: Q3 2028 (Sept 2028)
+                                            </span>
+                                        </div>
+
+                                        {/* Componente Gráfico de la Línea Temporal con Stickman */}
+                                        <div class="p-2 bg-slate-950/80 rounded-2xl border border-slate-900/60">
+                                            <InteractiveInteractiveTimeline 
+                                                contributions={contributions} 
+                                                processedData={processedData}
+                                                targetSaving={targetMonthlySaving}
+                                                metaTotal={metaTotal}
+                                                houseMetas={houseMetas}
+                                                saldoInicial={saldoInicial}
+                                            />
                                         </div>
                                     </div>
 
@@ -989,9 +1211,9 @@
                                             class="w-full accent-amber-500 bg-slate-800 rounded-lg h-2 cursor-pointer"
                                         />
                                         <div class="flex justify-between text-[10px] text-slate-500 font-bold uppercase">
-                                            <span>Mínimo (1.000 €)</span>
+                                            <span>Conservador (1.000 €)</span>
                                             <span>Velocidad Actual aprox: ({projections.actualMonthlyVelocity.toFixed(0)} €)</span>
-                                            <span>Máximo (4.500 €)</span>
+                                            <span>Agresivo (4.500 €)</span>
                                         </div>
                                     </div>
 
@@ -1003,52 +1225,6 @@
                                         </p>
                                         <div class="bg-slate-950 p-3 rounded-xl border border-slate-900 text-center text-sm font-semibold overflow-x-auto">
                                             {"$$\\text{Meses Restantes} = \\left\\lceil \\frac{\\text{Meta de Ahorro} - \\text{Saldo Acumulado}}{\\text{Ahorro Objetivo Mensual}} \\right\\rceil$$"}
-                                        </div>
-                                    </div>
-
-                                    {/* Tarjetas de Proyección de Tiempos */}
-                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        {/* Hito 1: Entrada y Gastos de la Casa */}
-                                        <div class="bg-slate-900/40 p-5 rounded-2xl border border-slate-800 space-y-3 relative overflow-hidden group">
-                                            <div class="absolute right-0 bottom-0 translate-x-4 translate-y-4 w-24 h-24 bg-cyan-500/5 rounded-full"></div>
-                                            <span class="text-[10px] uppercase font-black tracking-widest text-cyan-400 bg-cyan-500/10 px-2.5 py-1 rounded-md">1. Meta del Proyecto Entrada</span>
-                                            <div class="text-slate-400 text-xs mt-2">Restan por ahorrar:</div>
-                                            <div class="text-xl font-extrabold text-white">{projections.restanteCasa.toLocaleString('es-ES', { minimumFractionDigits: 2 })} €</div>
-                                            <div class="text-xs text-slate-300 font-medium">Se conseguirá en: <strong class="text-cyan-400">{projections.mesesParaCasa} meses</strong></div>
-                                            <div class="text-xs font-black text-white bg-slate-900 p-2.5 rounded-xl border border-slate-800 text-center uppercase tracking-wider">
-                                                Fecha objetivo: {projections.fechaCasaLabel}
-                                            </div>
-                                        </div>
-
-                                        {/* Hito 2: Casa completa + Amueblado */}
-                                        <div class="bg-slate-900/40 p-5 rounded-2xl border border-slate-800 space-y-3 relative overflow-hidden group">
-                                            <div class="absolute right-0 bottom-0 translate-x-4 translate-y-4 w-24 h-24 bg-pink-500/5 rounded-full"></div>
-                                            <span class="text-[10px] uppercase font-black tracking-widest text-pink-400 bg-pink-500/10 px-2.5 py-1 rounded-md">2. Casa + Muebles Completos</span>
-                                            <div class="text-slate-400 text-xs mt-2">Restante total necesario:</div>
-                                            <div class="text-xl font-extrabold text-white">{projections.totalRestanteProyectoCompleto.toLocaleString('es-ES', { minimumFractionDigits: 2 })} €</div>
-                                            <div class="text-xs text-slate-300 font-medium">Se conseguirá en: <strong class="text-pink-400">{projections.mesesParaCompleto} meses</strong></div>
-                                            <div class="text-xs font-black text-white bg-slate-900 p-2.5 rounded-xl border border-slate-800 text-center uppercase tracking-wider">
-                                                Fecha objetivo: {projections.fechaCompletoLabel}
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* DIAGNÓSTICO FINANCIERO Y CONSEJOS EN TIEMPO REAL */}
-                                    <div class="bg-slate-900/30 p-6 rounded-3xl border border-slate-800 space-y-4">
-                                        <h3 class="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-1.5">★ Informe del Diagnóstico Financiero</h3>
-                                        <div class="space-y-3 text-xs leading-relaxed text-slate-300">
-                                            <div class="p-3 bg-slate-900/60 rounded-xl border border-slate-800 flex items-start gap-2.5">
-                                                <div class="p-1 bg-emerald-500/10 text-emerald-400 rounded-md shrink-0">✓</div>
-                                                <p>
-                                                    <strong>Buen ritmo de fondo:</strong> Vuestra velocidad de ahorro real promedio está en torno a los <strong class="text-emerald-400">{projections.actualMonthlyVelocity.toFixed(0)} € al mes</strong>. A este paso, el fondo para el pago final de la entrada estará cubierto de sobra antes de que vuestra constructora exija la firma definitiva de escrituras.
-                                                </p>
-                                            </div>
-                                            <div class="p-3 bg-slate-900/60 rounded-xl border border-slate-800 flex items-start gap-2.5">
-                                                <div class="p-1 bg-cyan-500/10 text-cyan-400 rounded-md shrink-0">ℹ</div>
-                                                <p>
-                                                    <strong>Recomendación para armarios e iluminación:</strong> Es ideal acometer la distribución y equipamiento interior de los armarios, así como la instalación de focos e iluminaciones, justo antes de meter los muebles voluminosos de las habitaciones. Facilita enormemente el trabajo y evita llenar de polvo vuestro sofá o estructuras de cama.
-                                                </p>
-                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -1252,53 +1428,175 @@
                             {/* PESTAÑA: CONFIGURACIÓN Y SINCRONIZACIÓN NUBE */}
                             {currentTab === 'config' && (
                                 <div class="space-y-6 animate-fadeIn">
+                                    {/* Panel de Autenticación y Whitelist */}
                                     <div class="bg-slate-900 border border-slate-800 rounded-3xl p-5 space-y-4 shadow-xl">
-                                        <div class="flex items-center justify-between">
-                                            <h3 class="font-bold text-white text-sm">Configurar Sincronización en la Nube (Firebase)</h3>
-                                            <button onClick={resetToDefaultCredentials} class="text-xs text-rose-400 hover:underline">Restaurar Originales</button>
-                                        </div>
+                                        <h3 class="font-bold text-white text-sm flex items-center gap-1.5">
+                                            <span class="text-cyan-400">{SVGIcons.lock}</span>
+                                            Gestión de Seguridad & Lista de Acceso
+                                        </h3>
                                         <p class="text-xs text-slate-400 leading-relaxed">
-                                            La aplicación utiliza las credenciales que has facilitado para conectar de manera segura con tu base de datos de <strong>housecontrol-2bace</strong> de forma gratuita.
+                                            Define qué cuentas de Google tienen permiso para acceder y editar vuestro Workspace. Cualquier otro email de Google será rechazado automáticamente.
                                         </p>
-                                        <form onSubmit={updateFirebaseConfigInApp} class="space-y-3 text-xs">
-                                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                                <div>
-                                                    <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">apiKey</label>
-                                                    <input type="text" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white font-mono text-[11px]" value={firebaseConfigForm.apiKey} onChange={e => setFirebaseConfigForm({...firebaseConfigForm, apiKey: e.target.value})} />
-                                                </div>
-                                                <div>
-                                                    <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">projectId</label>
-                                                    <input type="text" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white font-mono text-[11px]" value={firebaseConfigForm.projectId} onChange={e => setFirebaseConfigForm({...firebaseConfigForm, projectId: e.target.value})} />
-                                                </div>
+                                        <div class="space-y-3">
+                                            <div>
+                                                <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1.5">Correos Autorizados (Separados por comas)</label>
+                                                <input 
+                                                    type="text" 
+                                                    class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs font-semibold text-white tracking-wide placeholder-slate-600 focus:outline-none focus:border-cyan-500"
+                                                    value={allowedEmails.join(', ')} 
+                                                    onChange={e => {
+                                                        const clean = e.target.value.split(',').map(em => em.trim().toLowerCase()).filter(em => em.length > 0);
+                                                        setAllowedEmails(clean);
+                                                        persistData(contributions, metaTotal, saldoInicial, houseMetas, furnitureBudget, revolutCorrection, revolutCorrectionReason, dailyInterestRate, reconciliationDate, clean);
+                                                    }} 
+                                                />
                                             </div>
-                                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                                <div>
-                                                    <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">authDomain</label>
-                                                    <input type="text" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white font-mono text-[11px]" value={firebaseConfigForm.authDomain} onChange={e => setFirebaseConfigForm({...firebaseConfigForm, authDomain: e.target.value})} />
-                                                </div>
-                                                <div>
-                                                    <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">appId</label>
-                                                    <input type="text" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white font-mono text-[11px]" value={firebaseConfigForm.appId} onChange={e => setFirebaseConfigForm({...firebaseConfigForm, appId: e.target.value})} />
-                                                </div>
+                                            <div>
+                                                <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1.5">PIN Familiar Secreto (De respaldo)</label>
+                                                <input 
+                                                    type="text" 
+                                                    class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs font-black text-white tracking-widest placeholder-slate-600 focus:outline-none focus:border-cyan-500"
+                                                    value={familyPin} 
+                                                    onChange={e => {
+                                                        setFamilyPin(e.target.value);
+                                                        persistData(contributions, metaTotal, saldoInicial, houseMetas, furnitureBudget, revolutCorrection, revolutCorrectionReason, dailyInterestRate, reconciliationDate, allowedEmails, e.target.value);
+                                                    }} 
+                                                />
                                             </div>
-                                            <button type="submit" class="w-full bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-bold py-2.5 rounded-xl transition shadow-lg shadow-cyan-600/20">
-                                                Reconectar Base de Datos
-                                            </button>
-                                        </form>
+                                        </div>
                                     </div>
 
-                                    {/* Importar Respaldos */}
+                                    {/* Panel de Configuración de Intereses y Balance Conjunto */}
                                     <div class="bg-slate-900 border border-slate-800 rounded-3xl p-5 space-y-4 shadow-xl">
-                                        <h3 class="font-bold text-white text-sm">Carga vuestro Excel a Firebase (Respaldos .CSV)</h3>
+                                        <h3 class="font-bold text-white text-sm flex items-center gap-1.5">
+                                            <span class="text-emerald-400">{SVGIcons.wallet}</span>
+                                            Ajustes de Goteo de Intereses y Conciliación
+                                        </h3>
                                         <p class="text-xs text-slate-400 leading-relaxed">
-                                            Sube tu archivo de simulación en formato CSV para actualizar de forma inmediata todas las aportaciones históricas de Laura y Asier en vuestra nube de Firebase Firestore.
+                                            Para que la cuenta de Revolut esté 100% automatizada con los céntimos de intereses diarios y descuadres menores, concilia el balance base de vuestro último mes y define el goteo diario:
                                         </p>
-                                        <div class="flex items-center gap-3">
-                                            <input type="file" accept=".csv" onChange={handleCSVUpload} id="csvFileInput" class="hidden" />
-                                            <label htmlFor="csvFileInput" class="cursor-pointer bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition shadow-lg shadow-emerald-500/20">
-                                                Subir Archivo CSV de Cuentas
-                                            </label>
+                                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                            <div>
+                                                <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Goteo Diario (€/día)</label>
+                                                <input 
+                                                    type="number" 
+                                                    step="0.01"
+                                                    class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs font-bold text-white focus:outline-none focus:border-emerald-500" 
+                                                    value={dailyInterestRate}
+                                                    onChange={e => {
+                                                        const val = Number(e.target.value);
+                                                        setDailyInterestRate(val);
+                                                        persistData(contributions, metaTotal, saldoInicial, houseMetas, furnitureBudget, revolutCorrection, revolutCorrectionReason, val);
+                                                    }}
+                                                />
+                                            </div>
+                                            <div>
+                                                <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Fecha de Último Cuadre</label>
+                                                <input 
+                                                    type="date" 
+                                                    class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs font-bold text-white focus:outline-none focus:border-emerald-500" 
+                                                    value={reconciliationDate}
+                                                    onChange={e => {
+                                                        setReconciliationDate(e.target.value);
+                                                        persistData(contributions, metaTotal, saldoInicial, houseMetas, furnitureBudget, revolutCorrection, revolutCorrectionReason, dailyInterestRate, e.target.value);
+                                                    }}
+                                                />
+                                            </div>
+                                            <div>
+                                                <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Corrector de Desfase (€)</label>
+                                                <input 
+                                                    type="number" 
+                                                    step="0.01"
+                                                    class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs font-bold text-white focus:outline-none focus:border-emerald-500" 
+                                                    value={revolutCorrection}
+                                                    onChange={e => {
+                                                        const val = Number(e.target.value);
+                                                        setRevolutCorrection(val);
+                                                        persistData(contributions, metaTotal, saldoInicial, houseMetas, furnitureBudget, val);
+                                                    }}
+                                                />
+                                            </div>
                                         </div>
+                                        <div>
+                                            <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Descripción / Motivo del Correctivo</label>
+                                            <input 
+                                                type="text" 
+                                                placeholder="Ej: Redondeos acumulados y pico de cuenta conjunta..."
+                                                class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs font-semibold text-white focus:outline-none focus:border-emerald-500" 
+                                                value={revolutCorrectionReason}
+                                                onChange={e => {
+                                                    setRevolutCorrectionReason(e.target.value);
+                                                    persistData(contributions, metaTotal, saldoInicial, houseMetas, furnitureBudget, revolutCorrection, e.target.value);
+                                                }}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* Panel de Diagnóstico Firebase */}
+                                    <div class="bg-slate-900 border border-slate-800 rounded-3xl p-5 space-y-4 shadow-xl">
+                                        <h3 class="font-bold text-white text-sm flex items-center gap-1.5">
+                                            <span class="text-cyan-400">{SVGIcons.settings}</span>
+                                            Panel de Diagnóstico de Conexión
+                                        </h3>
+                                        
+                                        <div class="space-y-3 text-xs">
+                                            {/* Paso 1: Librerías cargadas */}
+                                            <div class="flex items-center justify-between p-2.5 bg-slate-950 rounded-xl border border-slate-900">
+                                                <span class="text-slate-400 font-medium">1. SDK de Firebase en Navegador</span>
+                                                {typeof firebase !== 'undefined' ? (
+                                                    <span class="text-emerald-400 font-bold flex items-center gap-1">✓ Cargado</span>
+                                                ) : (
+                                                    <span class="text-rose-400 font-bold flex items-center gap-1">✗ Error</span>
+                                                )}
+                                            </div>
+
+                                            {/* Paso 2: Autenticación */}
+                                            <div class="flex items-center justify-between p-2.5 bg-slate-950 rounded-xl border border-slate-900">
+                                                <span class="text-slate-400 font-medium">2. Estado de Sesión Protegida</span>
+                                                {isAuthenticated ? (
+                                                    <span class="text-emerald-400 font-bold flex items-center gap-1">✓ Sesión Iniciada ({userEmail || 'Mediante PIN'})</span>
+                                                ) : (
+                                                    <span class="text-rose-400 font-bold flex items-center gap-1">✗ No conectado</span>
+                                                )}
+                                            </div>
+
+                                            {/* Paso 3: Estado de Datos */}
+                                            <div class="flex items-center justify-between p-2.5 bg-slate-950 rounded-xl border border-slate-900">
+                                                <span class="text-slate-400 font-medium">3. Sincronización en Tiempo Real</span>
+                                                {firebaseStatus === 'connected' ? (
+                                                    <span class="text-emerald-400 font-bold flex items-center gap-1">✓ Activo (Nube)</span>
+                                                ) : (
+                                                    <span class="text-blue-400 font-bold flex items-center gap-1">Local (Navegador)</span>
+                                                )}
+                                            </div>
+
+                                            {/* Error de Diagnóstico */}
+                                            {firebaseError && (
+                                                <div class="bg-rose-500/10 border border-rose-500/20 p-4 rounded-xl space-y-2 animate-fadeIn">
+                                                    <div class="text-rose-400 font-extrabold text-xs uppercase tracking-wider flex items-center gap-1.5">
+                                                        ⚠ Error de conexión
+                                                    </div>
+                                                    <p class="text-slate-300 leading-relaxed text-[11px]">
+                                                        {firebaseError}
+                                                    </p>
+                                                    {firebaseError.includes("inicio de sesión") && (
+                                                        <div class="text-slate-400 text-[10px] leading-relaxed mt-2 pt-2 border-t border-rose-500/10">
+                                                            <strong>Cómo solucionarlo:</strong> Ve a tu <a href="https://console.firebase.google.com/" target="_blank" rel="noopener noreferrer" class="text-cyan-400 underline">consola de Firebase</a>, entra en tu proyecto <strong>housecontrol-2bace</strong>, ve a <strong>Authentication</strong> (en el menú izquierdo), luego haz clic en la pestaña <strong>Sign-in method</strong>, busca <strong>Anónimo (Anonymous)</strong> en la lista de proveedores nativos, actívalo y haz clic en Guardar. Después de hacerlo, recarga esta página y se conectará en verde al instante.
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {firebaseStatus === 'connected' && (
+                                            <button 
+                                                onClick={uploadCurrentDataToFirebase} 
+                                                class="w-full bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black py-2.5 rounded-xl transition shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-1.5"
+                                            >
+                                                {SVGIcons.save}
+                                                Sincronizar mis datos actuales en Firebase
+                                            </button>
+                                        )}
                                     </div>
                                 </div>
                             )}
@@ -1325,7 +1623,6 @@
             const maxVal = Math.max(...rows.map(r => Math.max(r.acumulado, r.simulacionAcumulado, metaTotal))) * 1.1;
             const minVal = 0;
 
-            // Coordenadas calculadas para la línea "Real" y "Simulación"
             const pointsReal = rows.map((r, i) => {
                 const x = padding + (i / (rows.length - 1)) * (width - padding * 2);
                 const y = height - padding - ((r.acumulado - minVal) / (maxVal - minVal)) * (height - padding * 2);
@@ -1338,17 +1635,20 @@
                 return { x, y, val: r.simulacionAcumulado };
             });
 
-            // Generar los comandos d="" para dbuixar el path
             const pathRealD = pointsReal.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
             const pathSimD = pointsSim.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
 
-            // Área sombreada para el progreso real
             const areaRealD = `${pathRealD} L ${pointsReal[pointsReal.length - 1].x} ${height - padding} L ${pointsReal[0].x} ${height - padding} Z`;
 
             return (
                 <div class="relative w-full">
                     <svg viewBox={`0 0 ${width} ${height}`} class="w-full h-auto text-slate-700">
-                        {/* Líneas de cuadrícula horizontales */}
+                        <defs>
+                            <linearGradient id="realGradient" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0%" stopColor="#0ea5e9" />
+                                <stop offset="100%" stopColor="transparent" />
+                            </linearGradient>
+                        </defs>
                         {[0, 0.25, 0.5, 0.75, 1].map((ratio, idx) => {
                             const y = padding + ratio * (height - padding * 2);
                             const valLabel = Math.round(maxVal - ratio * (maxVal - minVal));
@@ -1362,16 +1662,10 @@
                             );
                         })}
 
-                        {/* Relleno de área de Ahorro Real */}
                         <path d={areaRealD} fill="url(#realGradient)" opacity="0.12" />
-
-                        {/* Línea Simulación Planificada (Dashed) */}
                         <path d={pathSimD} fill="none" stroke="#6366f1" strokeWidth="2" strokeDasharray="3,3" />
-
-                        {/* Línea Ahorro Real (Sólida) */}
                         <path d={pathRealD} fill="none" stroke="#0ea5e9" strokeWidth="3" strokeLinecap="round" />
 
-                        {/* Puntos sobre el ahorro real */}
                         {pointsReal.map((p, i) => (
                             <g key={i} class="group cursor-pointer">
                                 <circle cx={p.x} cy={p.y} r="3.5" fill="#0ea5e9" stroke="#0f172a" strokeWidth="1.5" />
@@ -1380,21 +1674,221 @@
                             </g>
                         ))}
 
-                        {/* Etiquetas del eje X (Meses abreviados) */}
                         {pointsReal.filter((_, idx) => idx % 2 === 0).map((p, idx) => (
                             <text key={idx} x={p.x} y={height - 8} fill="#64748b" fontSize="8" fontWeight="bold" textAnchor="middle">
                                 {p.name.split(' ')[0]}
                             </text>
                         ))}
-
-                        {/* Definiciones de gradientes */}
-                        <defs>
-                            <linearGradient id="realGradient" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="0%" stopColor="#0ea5e9" />
-                                <stop offset="100%" stopColor="transparent" />
-                            </linearGradient>
-                        </defs>
                     </svg>
+                </div>
+            );
+        }
+
+        // --- COMPONENTE INTERACTIVO DE LÍNEA TEMPORAL DE LA CASA CON EL "MONIGOTE" EN EL DÍA EXACTO ---
+        function InteractiveInteractiveTimeline({ contributions, processedData, targetSaving, metaTotal, houseMetas, saldoInicial }) {
+            const totalMuebles = processedData.totalMueblesPresupuesto - processedData.totalMueblesGastado;
+
+            // Motor de Proyección de Hitos Dinámico
+            const lastMonthIndex = contributions.length;
+            const lastMonthAccumulated = processedData.totalAhorrado;
+
+            const calculateMonthProjection = (targetAmount) => {
+                if (targetAmount <= lastMonthAccumulated) {
+                    let sum = saldoInicial;
+                    for (let i = 0; i < contributions.length; i++) {
+                        sum += Number(contributions[i].laura) + Number(contributions[i].asier);
+                        if (sum >= targetAmount) {
+                            return i + 1; // Month index (1-based)
+                        }
+                    }
+                    return 1;
+                } else {
+                    const remaining = targetAmount - lastMonthAccumulated;
+                    const additional = Math.ceil(remaining / targetSaving);
+                    return lastMonthIndex + additional;
+                }
+            };
+
+            // Hito 1: Entrada (34.870 €)
+            const indexEntrada = calculateMonthProjection(34870);
+            // Hito 2: IVA & Gastos (62.766 € acumulado)
+            const indexIVA = calculateMonthProjection(34870 + 27896);
+            // Hito 3: Personalización (66.629,20 € acumulado)
+            const indexPersonalizacion = calculateMonthProjection(metaTotal);
+            // Hito 4: Muebles Completos
+            const indexMuebles = calculateMonthProjection(metaTotal + totalMuebles);
+
+            // Conversor de número de mes (1 = Marzo 2026) a etiqueta legible de mes y año
+            const getMonthLabel = (idx) => {
+                const date = new Date(2026, 2, 1); // Marzo 1, 2026
+                date.setMonth(date.getMonth() + (idx - 1));
+                return date.toLocaleDateString('es-ES', { month: 'short', year: '2-digit' }).toUpperCase();
+            };
+
+            const getMonthFullLabel = (idx) => {
+                const date = new Date(2026, 2, 1);
+                date.setMonth(date.getMonth() + (idx - 1));
+                return date.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
+            };
+
+            // Eje de la línea temporal: Marzo 2026 (Mes 1) a Septiembre 2028 (Mes 31) -> 31 meses
+            const mapIndexToPercentage = (idx) => {
+                return Math.max(0, Math.min(100, ((idx - 1) / 30) * 100));
+            };
+
+            // Posición de hoy (12 de junio de 2026)
+            // Marzo 2026 a Septiembre 2028 es 944 días. Hoy es el día 104.
+            const todayPercentage = 11.0; 
+
+            // Hitos con sus porcentajes y metadatos
+            const timelineMilestones = [
+                {
+                    id: 'entrada',
+                    label: '10% Segunda Entrada',
+                    amount: '34.870 €',
+                    index: indexEntrada,
+                    color: 'text-cyan-400',
+                    bgColor: 'bg-cyan-500',
+                    borderColor: 'border-cyan-500',
+                    isPast: indexEntrada <= 4, // Ya pasó de junio de 2026
+                    deadlineOk: indexEntrada <= 31
+                },
+                {
+                    id: 'iva',
+                    label: 'IVA & Gastos de Escritura',
+                    amount: '27.896 €',
+                    index: indexIVA,
+                    color: 'text-purple-400',
+                    bgColor: 'bg-purple-500',
+                    borderColor: 'border-purple-500',
+                    isPast: indexIVA <= 4,
+                    deadlineOk: indexIVA <= 31
+                },
+                {
+                    id: 'pers',
+                    label: 'Personalización',
+                    amount: '3.863 €',
+                    index: indexPersonalizacion,
+                    color: 'text-brand-400',
+                    bgColor: 'bg-brand-500',
+                    borderColor: 'border-brand-500',
+                    isPast: indexPersonalizacion <= 4,
+                    deadlineOk: indexPersonalizacion <= 31
+                },
+                {
+                    id: 'muebles',
+                    label: 'muebles completos',
+                    amount: `${totalMuebles.toLocaleString('es-ES')} €`,
+                    index: indexMuebles,
+                    color: 'text-pink-400',
+                    bgColor: 'bg-pink-500',
+                    borderColor: 'border-pink-500',
+                    isPast: indexMuebles <= 4,
+                    deadlineOk: indexMuebles <= 31
+                }
+            ];
+
+            return (
+                <div class="space-y-8 py-6 px-4">
+                    {/* El carril de la línea temporal */}
+                    <div class="relative w-full h-12 flex items-center">
+                        {/* Línea base de carril */}
+                        <div class="absolute w-full h-1.5 bg-slate-800 rounded-full"></div>
+                        
+                        {/* Progreso completado de tiempo hasta HOY */}
+                        <div class="absolute h-1.5 bg-gradient-to-r from-cyan-600 to-indigo-500 rounded-full" style={{ width: `${todayPercentage}%` }}></div>
+
+                        {/* PIN DE HOY: El Monigote Constructor 👷‍♂️ */}
+                        <div class="absolute -translate-x-1/2 -top-1 z-30 flex flex-col items-center" style={{ left: `${todayPercentage}%` }}>
+                            {/* Globo interactivo */}
+                            <div class="bg-indigo-600 text-white font-extrabold text-[9px] px-2 py-0.5 rounded-md mb-1 shadow-lg shadow-indigo-500/20 whitespace-nowrap animate-bounce uppercase">
+                                ¡Estáis aquí!
+                            </div>
+                            {/* Monigote SVG */}
+                            <div class="relative">
+                                <span class="absolute -inset-1 rounded-full bg-cyan-500/30 glowing-ring"></span>
+                                <svg class="w-6 h-6 text-yellow-400 drop-shadow" viewBox="0 0 24 24" fill="currentColor">
+                                    {/* Dibujo de monigote con casco de seguridad */}
+                                    <circle cx="12" cy="8" r="4" fill="#fbbf24" />
+                                    <path d="M12 2a4 4 0 0 1 4 4h-8a4 4 0 0 1 4-4z" fill="#f59e0b" /> {/* Casco */}
+                                    <path d="M12 14c-4.418 0-8 2.239-8 5v3h16v-3c0-2.761-3.582-5-8-5z" fill="#38bdf8" /> {/* Cuerpo azul */}
+                                </svg>
+                            </div>
+                        </div>
+
+                        {/* Hitos a lo largo del carril */}
+                        {timelineMilestones.map((milestone) => {
+                            const pct = mapIndexToPercentage(milestone.index);
+                            const onTime = milestone.deadlineOk;
+                            return (
+                                <div key={milestone.id} class="absolute -translate-x-1/2 flex flex-col items-center z-10" style={{ left: `${pct}%` }}>
+                                    {/* Marcador del punto */}
+                                    <div class={`w-4 h-4 rounded-full border-2 bg-slate-950 flex items-center justify-center transition-all ${
+                                        milestone.isPast ? 'border-emerald-500 bg-emerald-500/10' :
+                                        onTime ? 'border-cyan-500 bg-cyan-500/10' : 'border-rose-500 bg-rose-500/10'
+                                    }`}>
+                                        <span class={`w-1.5 h-1.5 rounded-full ${milestone.isPast ? 'bg-emerald-400' : onTime ? 'bg-cyan-400' : 'bg-rose-500 animate-ping'}`}></span>
+                                    </div>
+                                    {/* Etiqueta del mes debajo del carril */}
+                                    <span class="text-[9px] font-black text-slate-400 mt-2 bg-slate-900 px-1 py-0.5 rounded border border-slate-800">
+                                        {getMonthLabel(milestone.index)}
+                                    </span>
+                                </div>
+                            );
+                        })}
+
+                        {/* Hito Final Límite: Septiembre de 2028 */}
+                        <div class="absolute right-0 -translate-x-1/2 flex flex-col items-center z-20">
+                            <div class="w-5 h-5 rounded-lg bg-indigo-600 flex items-center justify-center text-white border border-indigo-500 shadow-md">
+                                🗝️
+                            </div>
+                            <span class="text-[9px] font-black text-indigo-400 mt-2 bg-indigo-950/60 px-1 py-0.5 rounded border border-indigo-800/40">
+                                SEP 28
+                            </span>
+                        </div>
+                    </div>
+
+                    {/* Explicación y desglose de los hitos proyectados en formato de tarjetas */}
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-8 pt-4">
+                        {timelineMilestones.map((m) => {
+                            const onTime = m.deadlineOk;
+                            const isFinished = m.isPast;
+                            return (
+                                <div key={m.id} class={`p-4 rounded-2xl border transition ${
+                                    isFinished ? 'bg-emerald-950/10 border-emerald-500/20' :
+                                    onTime ? 'bg-slate-900/60 border-slate-800/80' : 'bg-rose-950/10 border-rose-500/20'
+                                }`}>
+                                    <div class="flex items-start justify-between">
+                                        <div class="space-y-1">
+                                            <h4 class="text-xs font-black text-white uppercase tracking-wider">{m.label}</h4>
+                                            <p class="text-[10px] text-slate-400">Objetivo acumulado necesario: <strong class="text-white">{m.amount}</strong></p>
+                                        </div>
+                                        <span class={`text-[9px] font-bold px-2 py-0.5 rounded-full ${
+                                            isFinished ? 'bg-emerald-500/10 text-emerald-400' :
+                                            onTime ? 'bg-cyan-500/10 text-cyan-400' : 'bg-rose-500/10 text-rose-400'
+                                        }`}>
+                                            {isFinished ? '¡YA ALCANZADO!' : onTime ? 'A tiempo' : 'En riesgo (tarde)'}
+                                        </span>
+                                    </div>
+                                    
+                                    <div class="mt-4 flex items-center justify-between text-xs">
+                                        <span class="text-slate-400">Fecha proyectada:</span>
+                                        <strong class="text-white font-extrabold">{getMonthFullLabel(m.index)}</strong>
+                                    </div>
+                                    
+                                    <div class="mt-2 text-[10px] text-slate-500 leading-relaxed">
+                                        {isFinished ? (
+                                            `Ya acumulasteis la cantidad correspondiente de este hito con las aportaciones registradas.`
+                                        ) : onTime ? (
+                                            `Llegaréis con holgura de ${31 - m.index} meses antes del límite de firma establecido para el Q3 de 2028.`
+                                        ) : (
+                                            `Al ritmo de ahorro fijado (€${targetSaving}/mes), este hito se retrasará hasta después del límite. Se recomienda aumentar el ahorro.`
+                                        )}
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
                 </div>
             );
         }
