@@ -30,7 +30,7 @@
 
     <div id="root" class="h-full"></div>
 
-    <script type="text/babel" data-type="module">
+    <script type="text/babel">
         // --- CONFIGURACIÓN DE FIREBASE ---
         // REPLAZA ESTE OBJETO CON TUS CREDENCIALES REALES DE FIREBASE
         const firebaseConfig = {
@@ -620,7 +620,7 @@
         }
 
         // Renderizar la Aplicación en el DOM
-        const root = ReactDOM.createRoot(document.getElementById('root'));
+        const root = ReactWorld.createRoot || ReactDOM.createRoot(document.getElementById('root'));
         root.render(<App />);
     </script>
 </body>
