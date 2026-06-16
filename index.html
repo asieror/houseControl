@@ -67,7 +67,7 @@
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-    <!-- Firebase Compat SDKs (Máxima estabilidad para apps de un solo fichero) -->
+    <!-- Firebase Compat SDKs (Elimina los imports ES6 evitando el error de appendChild) -->
     <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore-compat.js"></script>
@@ -113,7 +113,7 @@
             { id: "m17", name: "Julio (Año 2)", laura: 800, asier: 1500, revolut: 18801, simulacion: 1685 },
             { id: "m18", name: "Agosto (Año 2)", laura: 800, asier: 2000, revolut: 19940, simulacion: 1527 },
             { id: "m19", name: "Septiembre (Año 2)", laura: 800, asier: 1500, revolut: 20580, simulacion: 1450 },
-            { id: "m20", name: "Octubre (Año 2)", laura: 800, asier: 1500, revolut: 10531.27, simulacion: 1373 } // Ajustado vuestro saldo base real de Revolut actual
+            { id: "m20", name: "Octubre (Año 2)", laura: 800, asier: 1500, revolut: 10531.27, simulacion: 1373 } // Saldo real de Revolut corregido por el usuario
         ];
 
         // --- LISTADO DE PRESUPUESTO DE MUEBLES ---
@@ -163,7 +163,7 @@
             const [furnitureBudget, setFurnitureBudget] = useState(DEFAULT_FURNITURE_BUDGET);
             
             // Corrector e Interés diario de Revolut (AUTOMATIZADO AL 1.15% ANUAL CON RETENCIÓN DEL 19%)
-            const [revolutCorrection, setRevolutCorrection] = useState(0.00); // Iniciado limpio gracias a vuestro nuevo saldo real corregido
+            const [revolutCorrection, setRevolutCorrection] = useState(0.00); 
             const [revolutCorrectionReason, setRevolutCorrectionReason] = useState("Ajuste inicial de saldo real de Revolut");
             const [annualInterestRate, setAnnualInterestRate] = useState(1.15); // 1.15% Anual
             const [taxRatePercentage, setTaxRatePercentage] = useState(19.00); // 19% de retención del IRPF en España
@@ -175,12 +175,17 @@
             const [asierInitialPayment, setAsierInitialPayment] = useState(10000); // Asier puso 10.000 €
             const [repaidToLaura, setRepaidToLaura] = useState(0); // Cantidad que Asier ya ha devuelto poco a poco
 
-            // Autenticación de usuarios
+            // Autenticación de usuarios Whitelist
             const [user, setUser] = useState(null);
             const [userEmail, setUserEmail] = useState("");
             const [allowedEmails, setAllowedEmails] = useState(["asier@gmail.com", "laura@gmail.com"]);
             const [familyPin, setFamilyPin] = useState("1234");
             const [isAuthenticated, setIsAuthenticated] = useState(false);
+            
+            // Estados para Login y Registro
+            const [loginEmailInput, setLoginEmailInput] = useState("");
+            const [loginPasswordInput, setLoginPasswordInput] = useState("");
+            const [isRegisterMode, setIsRegisterMode] = useState(false);
             const [loginPinInput, setLoginPinInput] = useState("");
             const [loginError, setLoginError] = useState("");
 
@@ -205,7 +210,7 @@
             const [tempCorrectionReason, setTempCorrectionReason] = useState("Ajuste inicial de saldo real de Revolut");
             const [tempRepaidAmount, setTempRepaidAmount] = useState("0");
             
-            // --- RESTAURADO: ESTADO PARA NUEVAS PARTIDAS DE MUEBLES ---
+            // Estado para nuevas partidas de muebles
             const [newFurniture, setNewFurniture] = useState({ category: "", item: "", amount: 0, priority: "Media" });
 
             // Sincronizar estados locales cuando cambia la base de datos de fondo
@@ -317,10 +322,12 @@
                     const db = firebase.firestore();
                     dbRef.current = db;
 
+                    // Escuchar estado de autenticación de Firebase
                     auth.onAuthStateChanged((firebaseUser) => {
                         if (firebaseUser) {
                             if (firebaseUser.email) {
-                                if (allowedEmails.includes(firebaseUser.email.toLowerCase())) {
+                                const emailLower = firebaseUser.email.toLowerCase();
+                                if (allowedEmails.includes(emailLower)) {
                                     setUser(firebaseUser);
                                     setUserEmail(firebaseUser.email);
                                     setIsAuthenticated(true);
@@ -522,6 +529,48 @@
                         console.error(err);
                         setLoginError(`Fallo al iniciar sesión: ${err.message}. Recuerda activar el inicio de sesión por Google en tu consola Firebase.`);
                     });
+            };
+
+            // Login tradicional con Email y Contraseña (Registro automático si no existe)
+            const handleEmailPasswordAuth = (e) => {
+                e.preventDefault();
+                setLoginError("");
+                if (typeof firebase === 'undefined') {
+                    setLoginError("Las librerías de Firebase no están listas.");
+                    return;
+                }
+
+                const email = loginEmailInput.trim().toLowerCase();
+                const password = loginPasswordInput;
+
+                if (!allowedEmails.includes(email)) {
+                    setLoginError(`El email ${email} no está en la lista de autorizados.`);
+                    return;
+                }
+
+                if (isRegisterMode) {
+                    firebase.auth().createUserWithEmailAndPassword(email, password)
+                        .then((userCredential) => {
+                            addNotification("Cuenta de pareja creada con éxito");
+                            setIsAuthenticated(true);
+                        })
+                        .catch((err) => {
+                            setLoginError(err.message);
+                        });
+                } else {
+                    firebase.auth().signInWithEmailAndPassword(email, password)
+                        .then((userCredential) => {
+                            addNotification("Sesión iniciada con éxito");
+                            setIsAuthenticated(true);
+                        })
+                        .catch((err) => {
+                            if (err.code === 'auth/user-not-found') {
+                                setLoginError("Este correo no está registrado. Marca la casilla de abajo para registrarte.");
+                            } else {
+                                setLoginError(err.message);
+                            }
+                        });
+                }
             };
 
             // Login por PIN
@@ -903,8 +952,112 @@
                 }
             };
 
+            // --- VISTA DE LOGIN Y REGISTRO AUTORIZADO DE PAREJA ---
+            if (!isAuthenticated) {
+                return (
+                    <div class="min-h-screen flex items-center justify-center bg-slate-950 px-4 md:p-6">
+                        <div class="bg-slate-900 border border-slate-800/80 p-8 rounded-3xl max-w-md w-full shadow-2xl space-y-6 text-center animate-fadeIn">
+                            <div class="flex flex-col items-center gap-2">
+                                <div class="p-3.5 bg-gradient-to-tr from-cyan-600 to-indigo-500 rounded-2xl shadow-xl shadow-cyan-500/20 text-white">
+                                    {SVGIcons.lock}
+                                </div>
+                                <h1 class="text-2xl font-black text-white tracking-tight">Vivienda Segura</h1>
+                                <p class="text-xs text-slate-400">Control de la Entrada & Gastos del Piso</p>
+                            </div>
+
+                            {loginError && (
+                                <div class="bg-rose-500/10 border border-rose-500/25 p-3 rounded-xl text-xs text-rose-300 font-semibold text-left leading-relaxed">
+                                    {loginError}
+                                </div>
+                            )}
+
+                            {/* Opción 1: Acceso rápido por PIN */}
+                            <form onSubmit={handlePinLogin} class="space-y-3">
+                                <label class="block text-left text-[10px] font-black text-slate-400 uppercase tracking-wider">Acceso rápido familiar por PIN</label>
+                                <input 
+                                    type="password" 
+                                    maxLength="10"
+                                    placeholder="Introduce el PIN de pareja..."
+                                    class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-center text-sm font-bold text-white tracking-widest placeholder-slate-600 focus:outline-none focus:border-cyan-500"
+                                    value={loginPinInput}
+                                    onChange={e => setLoginPinInput(e.target.value)}
+                                />
+                                <button type="submit" class="w-full bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-black py-3 rounded-xl transition shadow-lg shadow-cyan-500/20">
+                                    Validar PIN de Acceso
+                                </button>
+                            </form>
+
+                            <div class="relative flex py-2 items-center">
+                                <div class="flex-grow border-t border-slate-800/60"></div>
+                                <span class="flex-shrink mx-4 text-slate-500 text-[10px] font-black uppercase tracking-wider">o acceso por cuentas</span>
+                                <div class="flex-grow border-t border-slate-800/60"></div>
+                            </div>
+
+                            {/* Opción 2: Formulario tradicional Email & Contraseña de Pareja */}
+                            <form onSubmit={handleEmailPasswordAuth} class="space-y-3.5 text-left">
+                                <div>
+                                    <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Correo Electrónico Autorizado</label>
+                                    <input 
+                                        type="email" 
+                                        required
+                                        placeholder="ej: asier@gmail.com"
+                                        class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs font-semibold text-white placeholder-slate-700 focus:outline-none focus:border-cyan-500"
+                                        value={loginEmailInput}
+                                        onChange={e => setLoginEmailInput(e.target.value)}
+                                    />
+                                </div>
+                                <div>
+                                    <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Contraseña secreta</label>
+                                    <input 
+                                        type="password" 
+                                        required
+                                        placeholder="Contraseña..."
+                                        class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs font-semibold text-white placeholder-slate-700 focus:outline-none focus:border-cyan-500"
+                                        value={loginPasswordInput}
+                                        onChange={e => setLoginPasswordInput(e.target.value)}
+                                    />
+                                </div>
+
+                                <button type="submit" class="w-full bg-slate-100 hover:bg-white text-slate-950 text-xs font-black py-3 rounded-xl transition shadow-lg">
+                                    {isRegisterMode ? "Crear Cuenta de Pareja" : "Iniciar Sesión"}
+                                </button>
+
+                                <div class="text-center mt-2">
+                                    <button 
+                                        type="button" 
+                                        class="text-[11px] text-cyan-400 hover:underline"
+                                        onClick={() => setIsRegisterMode(!isRegisterMode)}
+                                    >
+                                        {isRegisterMode ? "¿Ya tienes cuenta? Iniciar Sesión" : "¿No estás registrado? Crear Cuenta de Pareja"}
+                                    </button>
+                                </div>
+                            </form>
+
+                            <div class="relative flex py-2 items-center">
+                                <div class="flex-grow border-t border-slate-800/60"></div>
+                                <span class="flex-shrink mx-4 text-slate-500 text-[10px] font-black uppercase tracking-wider">o</span>
+                                <div class="flex-grow border-t border-slate-800/60"></div>
+                            </div>
+
+                            {/* Opción 3: Acceso por Google */}
+                            <button 
+                                onClick={loginWithGoogle}
+                                class="w-full bg-slate-950 hover:bg-slate-850 text-white border border-slate-800 text-xs font-bold py-3.5 px-4 rounded-xl transition flex items-center justify-center gap-2.5 shadow-md"
+                            >
+                                {SVGIcons.google}
+                                Entrar con cuenta de Google
+                            </button>
+
+                            <p class="text-[10px] text-slate-500 font-medium">
+                                Esta aplicación está configurada para restringir accesos no autorizados al plan familiar.
+                            </p>
+                        </div>
+                    </div>
+                );
+            }
+
             return (
-                <div class="flex-1 flex flex-col min-h-screen">
+                <div class="flex-1 flex flex-col min-h-screen animate-fadeIn">
                     {/* ENCABEZADO PRÉMIUM */}
                     <header class="bg-slate-900 border-b border-slate-800 py-4 px-6 sticky top-0 z-40 shadow-xl">
                         <div class="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
@@ -1056,7 +1209,7 @@
                                             <div class="absolute right-0 bottom-0 translate-x-4 translate-y-4 w-24 h-24 bg-emerald-500/5 rounded-full"></div>
                                             <div class="flex justify-between items-start">
                                                 <span class="text-[10px] uppercase font-black tracking-widest text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-md">Intereses Netos ({annualInterestRate}% TIN)</span>
-                                                <span class="text-[10px] text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded-md">
+                                                <span class="text-[10px] text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded-md animate-pulse">
                                                     +{processedData.interestPerDay.toLocaleString('es-ES', { minimumFractionDigits: 4, maximumFractionDigits: 4 })} €/día (Neto)
                                                 </span>
                                             </div>
@@ -1751,7 +1904,7 @@
                                         
                                         <div class="bg-slate-950 p-4 rounded-xl border border-slate-900 text-xs text-slate-400 space-y-2">
                                             <p class="font-bold text-white">¿Cómo funciona la automatización con impuestos?</p>
-                                            <p>El sistema calcula cuántos días han pasado desde la fecha de vuestro último cuadre hasta el día de hoy, y le aplica un interés compuesto diario del <strong>{(annualInterestRate/365).toFixed(5)}% al día</strong> de forma transparente sobre vuestro capital. De esta forma, el saldo que veis en la app estará siempre en perfecta armonía con vuestra cuenta real de Revolut sin tocar nada.</p>
+                                            <p>El sistema calcula cuántos días han pasado desde la fecha de vuestro último cuadre hasta el día de hoy, y le aplica un interés compuesto diario de forma transparente sobre vuestro capital. De esta forma, el saldo que veis en la app estará siempre en perfecta armonía con vuestra cuenta real de Revolut sin tocar nada.</p>
                                         </div>
                                     </div>
 
@@ -1802,11 +1955,6 @@
                                                     <p class="text-slate-300 leading-relaxed text-[11px]">
                                                         {firebaseError}
                                                     </p>
-                                                    {firebaseError.includes("inicio de sesión") && (
-                                                        <div class="text-slate-400 text-[10px] leading-relaxed mt-2 pt-2 border-t border-rose-500/10">
-                                                            <strong>Cómo solucionarlo:</strong> Ve a tu <a href="https://console.firebase.google.com/" target="_blank" rel="noopener noreferrer" class="text-cyan-400 underline">consola de Firebase</a>, entra en tu proyecto <strong>housecontrol-2bace</strong>, ve a <strong>Authentication</strong> (en el menú izquierdo), luego haz clic en la pestaña <strong>Sign-in method</strong>, busca <strong>Anónimo (Anonymous)</strong> en la lista de proveedores nativos, actívalo y haz clic en Guardar. Después de hacerlo, recarga esta página y se conectará en verde al instante.
-                                                        </div>
-                                                    )}
                                                 </div>
                                             )}
                                         </div>
@@ -1959,7 +2107,7 @@
                 return Math.max(0, Math.min(100, ((idx - 1) / 30) * 100));
             };
 
-            // Posición de hoy (12 de junio de 2026)
+            // Posición de hoy (16 de junio de 2026)
             const todayPercentage = 11.0; 
 
             // Hitos con sus porcentajes y metadatos
