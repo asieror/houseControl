@@ -32,7 +32,6 @@
 
     <script type="text/babel">
         // --- CONFIGURACIÓN DE FIREBASE ---
-        // REPLAZA ESTE OBJETO CON TUS CREDENCIALES REALES DE FIREBASE
         const firebaseConfig = {
             apiKey: "TU_API_KEY",
             authDomain: "TU_AUTH_DOMAIN",
@@ -42,7 +41,7 @@
             appId: "TU_APP_ID"
         };
 
-        // Inicializar Firebase si no se ha hecho ya
+        // Inicializar Firebase
         if (!firebase.apps.length) {
             firebase.initializeApp(firebaseConfig);
         }
@@ -51,11 +50,9 @@
         const db = firebase.firestore();
         const googleProvider = new firebase.auth.GoogleAuthProvider();
 
-        // Emails autorizados para acceso administrativo/escritura
         const ALLOWED_EMAILS = [
             "laura@gmail.com", 
-            "asier@gmail.com",
-            "tu-email-de-pruebas@gmail.com" // Añade aquí tu correo de Google para pruebas
+            "asier@gmail.com"
         ];
 
         // --- ICONOS SVG COMPONENTES ---
@@ -70,7 +67,6 @@
             Edit: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
         };
 
-        // --- COMPONENTE PRINCIPAL ---
         function App() {
             // Estados de Autenticación
             const [user, setUser] = React.useState(null);
@@ -80,8 +76,8 @@
 
             // Estados de la Aplicación
             const [revolutBase, setRevolutBase] = React.useState(25000);
-            const [tin, setTin] = React.useState(3.5); // % TIN Cuenta Revolut
-            const [daysElapsed, setDaysElapsed] = React.useState(30); // Días acumulando intereses
+            const [tin, setTin] = React.useState(3.5); 
+            const [daysElapsed, setDaysElapsed] = React.useState(30); 
 
             // Estados de Equidad y Reembolsos
             const initialLaura = 33000;
@@ -137,21 +133,20 @@
                 });
             };
 
-            // --- CARGAR Y GUARDAR DATOS EN FIRESTORE (PROMESAS PURAS) ---
+            // --- CARGAR Y GUARDAR DATOS EN FIRESTORE ---
             const loadDataFromFirestore = () => {
                 db.collection("vivienda_segura").doc("dashboard").get()
                     .then((doc) => {
                         if (doc.exists) {
                             const data = doc.data();
-                            if (data.revolutBase) setRevolutBase(data.revolutBase);
-                            if (data.tin) setTin(data.tin);
-                            if (data.daysElapsed) setDaysElapsed(data.daysElapsed);
-                            if (data.refunds) setRefunds(data.refunds);
-                            if (data.months) setMonths(data.months);
-                            if (data.mortgage) setMortgage(data.mortgage);
-                            if (data.furniture) setFurniture(data.furniture);
+                            if (data.revolutBase !== undefined) setRevolutBase(data.revolutBase);
+                            if (data.tin !== undefined) setTin(data.tin);
+                            if (data.daysElapsed !== undefined) setDaysElapsed(data.daysElapsed);
+                            if (data.refunds !== undefined) setRefunds(data.refunds);
+                            if (data.months !== undefined) setMonths(data.months);
+                            if (data.mortgage !== undefined) setMortgage(data.mortgage);
+                            if (data.furniture !== undefined) setFurniture(data.furniture);
                         } else {
-                            // Inicializar base de datos vacía si no existe documento
                             syncToFirestore({
                                 revolutBase: 25000, tin: 3.5, daysElapsed: 30,
                                 refunds: [], months: [], mortgage: { capital: 150000, interest: 3.0, years: 30 },
@@ -164,36 +159,33 @@
 
             const syncToFirestore = (updatedFields) => {
                 db.collection("vivienda_segura").doc("dashboard").set(updatedFields, { merge: true })
-                    .then(() => console.log("Firestore Sincronizado exitosamente"))
+                    .then(() => console.log("Firestore Sincronizado"))
                     .catch((err) => console.error("Error al guardar en Firestore: ", err));
             };
 
-            // Efecto secundario para sincronizar de forma reactiva cuando cambian estados clave
             React.useEffect(() => {
                 if (user) {
                     const timer = setTimeout(() => {
                         syncToFirestore({ revolutBase, tin, daysElapsed, refunds, months, mortgage, furniture });
-                    }, 800); // Debounce de seguridad
+                    }, 800);
                     return () => clearTimeout(timer);
                 }
             }, [revolutBase, tin, daysElapsed, refunds, months, mortgage, furniture, user]);
 
             // --- LÓGICA DE FINANZAS Y CÁLCULOS ---
-            // Interés Compuesto Diario de Revolut Neto de IRPF (19%)
             const totalInteresesBrutos = revolutBase * Math.pow(1 + (tin / 100) / 365, daysElapsed) - revolutBase;
             const irpfRetencion = totalInteresesBrutos * 0.19;
             const revolutNeto = revolutBase + (totalInteresesBrutos - irpfRetencion);
 
-            // Cálculos del Balanceador de Equidad (50/50)
             const totalRefunds = refunds.reduce((acc, curr) => acc + parseFloat(curr.amount || 0), 0);
             const deudaInicialAsier = (initialLaura - initialAsier) / 2;
             const deudaActualAsier = deudaInicialAsier - totalRefunds;
 
-            // Operaciones del Historial Mensual (CRUD)
+            // CRUD Historial Mensual
             const handleAddMonth = (e) => {
                 e.preventDefault();
                 if (!newMonth.id) return;
-                const updatedMonths = [...months, { ...newMonth, lauraCount: parseFloat(newMonth.lauraCount), asierCount: parseFloat(newMonth.asierCount), simulatedPlan: parseFloat(newMonth.simulatedPlan) }];
+                const updatedMonths = [...months, { ...newMonth, lauraCount: parseFloat(newMonth.lauraCount || 0), asierCount: parseFloat(newMonth.asierCount || 0), simulatedPlan: parseFloat(newMonth.simulatedPlan || 0) }];
                 setMonths(updatedMonths);
                 setNewMonth({ id: "", lauraCount: 0, asierCount: 0, simulatedPlan: 1500 });
             };
@@ -204,7 +196,7 @@
             };
 
             const handleSaveEdit = (id) => {
-                const updatedMonths = months.map(m => m.id === id ? { ...m, lauraCount: parseFloat(editForm.lauraCount), asierCount: parseFloat(editForm.asierCount), simulatedPlan: parseFloat(editForm.simulatedPlan) } : m);
+                const updatedMonths = months.map(m => m.id === id ? { ...m, lauraCount: parseFloat(editForm.lauraCount || 0), asierCount: parseFloat(editForm.asierCount || 0), simulatedPlan: parseFloat(editForm.simulatedPlan || 0) } : m);
                 setMonths(updatedMonths);
                 setEditingMonth(null);
             };
@@ -213,7 +205,6 @@
                 setMonths(months.filter(m => m.id !== id));
             };
 
-            // Reembolsos
             const handleAddRefund = (e) => {
                 e.preventDefault();
                 if (!newRefund.amount) return;
@@ -226,12 +217,12 @@
                 setRefunds(refunds.filter(r => r.id !== id));
             };
 
-            // Simulación Amortización Francesa
-            const r = (mortgage.interest / 100) / 12;
-            const n = mortgage.years * 12;
-            const cuotaMensualHipoteca = r === 0 ? (mortgage.capital / n) : (mortgage.capital * r * Math.pow(1 + r, n)) / (Math.pow(1 + r, n) - 1);
+            // Hipoteca Francesa
+            const r_rate = (mortgage.interest / 100) / 12;
+            const n_months = mortgage.years * 12;
+            const cuotaMensualHipoteca = r_rate === 0 ? (mortgage.capital / n_months) : (mortgage.capital * r_rate * Math.pow(1 + r_rate, n_months)) / (Math.pow(1 + r_rate, n_months) - 1);
 
-            // Presupuesto Decoración Muebles
+            // Muebles
             const handleAddFurniture = (e) => {
                 e.preventDefault();
                 if (!newFurniture.item || !newFurniture.cost) return;
@@ -245,7 +236,7 @@
             };
             const totalFurnitureCost = furniture.reduce((acc, curr) => acc + curr.cost, 0);
 
-            // --- VISTA DE LOGIN ---
+            // --- RENDER VISTA LOGIN ---
             if (!user || !pinAuthenticated) {
                 return (
                     <div className="flex flex-col items-center justify-center min-h-screen px-4 bg-slate-950">
@@ -270,13 +261,13 @@
                                         <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">Paso 1: PIN de Acceso Común</label>
                                         <input 
                                             type="password" 
-                                            placeholder="Introduce el PIN local" 
+                                            placeholder="Introduce el PIN" 
                                             value={pin}
                                             onChange={(e) => setPin(e.target.value)}
-                                            className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-center text-xl font-mono tracking-widest text-white focus:outline-none focus:border-emerald-500 transition-colors"
+                                            className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-center text-xl font-mono tracking-widest text-white focus:outline-none focus:border-emerald-500"
                                         />
                                     </div>
-                                    <button type="submit" className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-xl tracking-wide shadow-lg shadow-emerald-600/20 transition-all">
+                                    <button type="submit" className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-xl tracking-wide shadow-lg transition-all">
                                         Validar PIN
                                     </button>
                                 </form>
@@ -288,7 +279,7 @@
                                         className="w-full flex items-center justify-center gap-3 py-3 bg-white hover:bg-slate-100 text-slate-900 font-semibold rounded-xl shadow-md transition-all"
                                     >
                                         <svg className="w-5 h-5" viewBox="0 0 24 24">
-                                            <path fill="#EA4335" d="M12.24 10.285V13.4h6.887c-.275 1.565-1.88 4.604-6.887 4.604-4.33 0-7.866-3.577-7.866-8s3.536-8 7.866-8c2.46 0 4.105 1.025 5.047 1.926l2.427-2.334C17.955 2.192 15.34 1 12.24 1 6.033 1 1 6.033 1 12.24s5.033 11.24 11.24 11.24c6.478 0 10.793-4.537 10.793-10.997 0-.746-.08-1.32-.176-1.883H12.24z"/>
+                                            <path fill="#EA4335" d="M12.24 10.285V13.4h6.887c-.275 1.565-1.88 4.604-6.887 4.604-4.33 0-7.866-3.577-7.866-8s3.536-8 7.866-8c2.46 0 4.105 1.025 5.047 1.926l2.427-2.334C17.955 2.192 15.34 1 12.24 1 6.033 1 12.24 1 6.033 1 12.24s5.033 11.24 11.24 11.24c6.478 0 10.793-4.537 10.793-10.997 0-.746-.08-1.32-.176-1.883H12.24z"/>
                                         </svg>
                                         Acceder con Google Auth
                                     </button>
@@ -299,16 +290,15 @@
                 );
             }
 
-            // --- VISTA PRINCIPAL DEL DASHBOARD ---
+            // --- RENDER DASHBOARD PRINCIPAL ---
             return (
                 <div className="min-h-screen flex flex-col bg-slate-950 text-slate-100">
-                    {/* Header */}
                     <header className="border-b border-slate-800 bg-slate-900/50 backdrop-blur sticky top-0 z-50 px-6 py-4 flex flex-col sm:flex-row justify-between items-center gap-4">
                         <div className="flex items-center gap-3">
                             <span className="p-2 bg-emerald-500/10 text-emerald-400 rounded-lg"><Icons.Home /></span>
                             <div>
                                 <h1 className="text-xl font-bold tracking-tight">Vivienda Segura 🏠</h1>
-                                <p className="text-xs text-slate-400">Edificando el futuro en Lutxana · Entrega Fin 2028</p>
+                                <p className="text-xs text-slate-400">Ahorro Común · Piso en Lutxana 2028</p>
                             </div>
                         </div>
                         <div className="flex items-center gap-4">
@@ -322,10 +312,8 @@
                         </div>
                     </header>
 
-                    {/* Contenedor Principal Grid */}
                     <main className="flex-1 p-6 space-y-6 max-w-7xl mx-auto w-full">
-                        
-                        {/* SECCIÓN 1: REVOLUT + INTERÉS COMPUESTO */}
+                        {/* REVOLUT + COMTADO INTERESES */}
                         <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                             <div className="lg:col-span-1 bg-slate-900 border border-slate-800 rounded-2xl p-6 flex flex-col justify-between">
                                 <div>
@@ -333,218 +321,144 @@
                                         <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Fondo Común Revolut</span>
                                         <span className="p-1.5 bg-sky-500/10 text-sky-400 rounded-lg"><Icons.TrendingUp /></span>
                                     </div>
-                                    <p className="text-xs text-slate-400">Saldo Final (Neto + IRPF 19%)</p>
+                                    <p className="text-xs text-slate-400">Saldo Neto Estimado (IRPF 19%)</p>
                                     <h2 className="text-4xl font-extrabold text-white tracking-tight mt-1">
                                         {revolutNeto.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}€
                                     </h2>
                                 </div>
                                 <div className="mt-6 pt-4 border-t border-slate-800 grid grid-cols-2 gap-2 text-xs">
                                     <div>
-                                        <span className="text-slate-400">Interés Generado:</span>
+                                        <span className="text-slate-400">Neto Generado:</span>
                                         <p className="font-semibold text-emerald-400">+{ (totalInteresesBrutos - irpfRetencion).toFixed(2) }€</p>
                                     </div>
                                     <div>
-                                        <span className="text-slate-400">Retención IRPF (19%):</span>
-                                        <p className="font-semibold text-red-400">-{ irpfRetencion.toFixed(2) }€</p>
+                                        <span className="text-slate-400">Retención (19%):</span>
+                                        <p className="font-semibold text-rose-400">-{ irpfRetencion.toFixed(2) }€</p>
                                     </div>
                                 </div>
                             </div>
 
                             <div className="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-2xl p-6">
-                                <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400 mb-4">Simulador de Rendimiento Diario</h3>
+                                <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400 mb-4">Parámetros Cuenta de Ahorro</h3>
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                     <div>
-                                        <label className="block text-xs font-medium text-slate-400 mb-1">Capital Base (€)</label>
-                                        <input 
-                                            type="number" 
-                                            value={revolutBase} 
-                                            onChange={(e) => setRevolutBase(parseFloat(e.target.value) || 0)} 
-                                            className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-white focus:outline-none focus:border-emerald-500"
-                                        />
+                                        <label className="block text-xs font-medium text-slate-400 mb-1">Capital Inicial (€)</label>
+                                        <input type="number" value={revolutBase} onChange={(e) => setRevolutBase(parseFloat(e.target.value) || 0)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-white focus:outline-none" />
                                     </div>
                                     <div>
                                         <label className="block text-xs font-medium text-slate-400 mb-1">TIN Nominal Anual (%)</label>
-                                        <input 
-                                            type="number" 
-                                            step="0.01" 
-                                            value={tin} 
-                                            onChange={(e) => setTin(parseFloat(e.target.value) || 0)} 
-                                            className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-white focus:outline-none focus:border-emerald-500"
-                                        />
+                                        <input type="number" step="0.01" value={tin} onChange={(e) => setTin(parseFloat(e.target.value) || 0)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-white focus:outline-none" />
                                     </div>
                                     <div>
-                                        <label className="block text-xs font-medium text-slate-400 mb-1">Días Transcurridos</label>
-                                        <input 
-                                            type="number" 
-                                            value={daysElapsed} 
-                                            onChange={(e) => setDaysElapsed(parseInt(e.target.value) || 0)} 
-                                            className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-white focus:outline-none focus:border-emerald-500"
-                                        />
+                                        <label className="block text-xs font-medium text-slate-400 mb-1">Días Acumulados</label>
+                                        <input type="number" value={daysElapsed} onChange={(e) => setDaysElapsed(parseInt(e.target.value) || 0)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-white focus:outline-none" />
                                     </div>
                                 </div>
-                                <p className="text-[11px] text-slate-500 mt-4 leading-relaxed">
-                                    * Cálculo computado bajo capitalización compuesta compuesta de forma diaria utilizando la fórmula estricta: $$Base \times (1 + \frac{TIN/100}{365})^{Días}$$ aplicando una reducción fija del 19% por retención fiscal sobre rendimientos del capital mobiliario.
-                                </p>
                             </div>
                         </section>
 
-                        {/* SECCIÓN 2: EQUIDAD 50/50 */}
+                        {/* EQUIDAD */}
                         <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                             <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 flex flex-col justify-between">
                                 <div>
                                     <div className="flex justify-between items-center mb-4">
-                                        <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Equilibrio Técnico Patrimonial</span>
+                                        <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Balance de Equidad (50/50)</span>
                                         <span className="p-1.5 bg-amber-500/10 text-amber-400 rounded-lg"><Icons.Scale /></span>
                                     </div>
-                                    <p className="text-xs text-slate-400">Aportación Inicial</p>
                                     <div className="grid grid-cols-2 gap-2 mt-1 mb-4 text-xs">
                                         <div className="bg-slate-950 p-2 rounded-lg border border-slate-800"><span className="text-slate-400">Laura:</span> <p className="font-bold text-white">33.000€</p></div>
                                         <div className="bg-slate-950 p-2 rounded-lg border border-slate-800"><span className="text-slate-400">Asier:</span> <p className="font-bold text-white">10.000€</p></div>
                                     </div>
-                                    <p className="text-xs text-slate-400">Deuda Interna Actual de Asier</p>
+                                    <p className="text-xs text-slate-400">Deuda Restante de Asier</p>
                                     <h2 className={`text-3xl font-extrabold tracking-tight mt-1 ${deudaActualAsier > 0 ? 'text-amber-400' : 'text-emerald-400'}`}>
-                                        {deudaActualAsier > 0 ? `${deudaActualAsier.toLocaleString('es-ES')}€` : '¡Saldado con Laura!'}
+                                        {deudaActualAsier > 0 ? `${deudaActualAsier.toLocaleString('es-ES')}€` : '¡Saldado al 50%!'}
                                     </h2>
-                                    {deudaActualAsier > 0 && <p className="text-[11px] text-slate-400 mt-1">Asier debe abonar esta cantidad a Laura para equiparar al 50%.</p>}
                                 </div>
                             </div>
 
                             <div className="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-2xl p-6">
-                                <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400 mb-4">Gestión de Reembolsos de Deuda</h3>
+                                <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400 mb-4">Reembolsos a Laura</h3>
                                 <form onSubmit={handleAddRefund} className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
-                                    <input 
-                                        type="number" 
-                                        placeholder="Cantidad (€)" 
-                                        value={newRefund.amount} 
-                                        onChange={(e) => setNewRefund({...newRefund, amount: e.target.value})}
-                                        className="px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-white text-sm focus:outline-none focus:border-emerald-500"
-                                    />
-                                    <input 
-                                        type="text" 
-                                        placeholder="Concepto / Nota" 
-                                        value={newRefund.description} 
-                                        onChange={(e) => setNewRefund({...newRefund, description: e.target.value})}
-                                        className="px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-white text-sm focus:outline-none focus:border-emerald-500"
-                                    />
-                                    <button type="submit" className="bg-amber-600 hover:bg-amber-500 text-white font-semibold text-sm rounded-lg py-2 transition-colors">
-                                        Registrar Pago
-                                    </button>
+                                    <input type="number" placeholder="Cantidad (€)" value={newRefund.amount} onChange={(e) => setNewRefund({...newRefund, amount: e.target.value})} className="px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-white text-sm focus:outline-none" />
+                                    <input type="text" placeholder="Concepto" value={newRefund.description} onChange={(e) => setNewRefund({...newRefund, description: e.target.value})} className="px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-white text-sm focus:outline-none" />
+                                    <button type="submit" className="bg-amber-600 hover:bg-amber-500 text-white font-semibold text-sm rounded-lg py-2 transition-colors">Registrar Pago</button>
                                 </form>
-                                <div className="max-h-40 overflow-y-auto space-y-2 border-t border-slate-800/60 pt-3">
-                                    {refunds.length === 0 ? <p className="text-xs text-slate-500">No hay amortizaciones internas registradas.</p> : 
-                                        refunds.map(r => (
-                                            <div key={r.id} className="flex justify-between items-center text-xs bg-slate-950 p-2.5 rounded-lg border border-slate-800">
-                                                <div>
-                                                    <span className="font-semibold text-white">{r.amount}€</span>
-                                                    <span className="text-slate-400 mx-2">|</span>
-                                                    <span className="text-slate-300">{r.description || 'Amortización'}</span>
-                                                </div>
-                                                <div className="flex items-center gap-3">
-                                                    <span className="text-slate-500 text-[10px]">{r.date}</span>
-                                                    <button onClick={() => handleDeleteRefund(r.id)} className="text-red-400 hover:text-red-300"><Icons.Trash /></button>
-                                                </div>
-                                            </div>
-                                        ))
-                                    }
+                                <div className="max-h-32 overflow-y-auto space-y-1.5">
+                                    {refunds.map(r => (
+                                        <div key={r.id} className="flex justify-between items-center text-xs bg-slate-950 p-2 rounded-lg border border-slate-800">
+                                            <span><strong className="text-white">{r.amount}€</strong> - {r.description || 'Devolución'}</span>
+                                            <button onClick={() => handleDeleteRefund(r.id)} className="text-rose-400 hover:text-rose-300"><Icons.Trash /></button>
+                                        </div>
+                                    ))}
                                 </div>
                             </div>
                         </section>
 
-                        {/* SECCIÓN 3: HISTORIAL MENSUAL CRUD */}
+                        {/* HISTORIAL MENSUAL (CRUD) */}
                         <section className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
-                            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+                            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
                                 <div className="flex items-center gap-2">
                                     <span className="p-1.5 bg-emerald-500/10 text-emerald-400 rounded-lg"><Icons.Calendar /></span>
-                                    <h3 className="text-base font-bold uppercase tracking-wider text-slate-300">Historial de Aportaciones Mensuales</h3>
+                                    <h3 className="text-sm font-bold uppercase tracking-wider text-slate-300">Historial Mensual</h3>
                                 </div>
-                                <form onSubmit={handleAddMonth} className="flex flex-wrap items-center gap-2 bg-slate-950 p-3 rounded-xl border border-slate-800 w-full sm:w-auto">
-                                    <input 
-                                        type="text" 
-                                        placeholder="Ej: Ene 2026" 
-                                        value={newMonth.id} 
-                                        onChange={(e) => setNewMonth({...newMonth, id: e.target.value})}
-                                        className="px-2 py-1 bg-slate-900 border border-slate-800 rounded text-xs text-white focus:outline-none w-24"
-                                    />
-                                    <input 
-                                        type="number" 
-                                        placeholder="Laura €" 
-                                        value={newMonth.lauraCount || ""} 
-                                        onChange={(e) => setNewMonth({...newMonth, lauraCount: e.target.value})}
-                                        className="px-2 py-1 bg-slate-900 border border-slate-800 rounded text-xs text-white focus:outline-none w-20"
-                                    />
-                                    <input 
-                                        type="number" 
-                                        placeholder="Asier €" 
-                                        value={newMonth.asierCount || ""} 
-                                        onChange={(e) => setNewMonth({...newMonth, asierCount: e.target.value})}
-                                        className="px-2 py-1 bg-slate-900 border border-slate-800 rounded text-xs text-white focus:outline-none w-20"
-                                    />
-                                    <input 
-                                        type="number" 
-                                        placeholder="Plan Sim €" 
-                                        value={newMonth.simulatedPlan || ""} 
-                                        onChange={(e) => setNewMonth({...newMonth, simulatedPlan: e.target.value})}
-                                        className="px-2 py-1 bg-slate-900 border border-slate-800 rounded text-xs text-white focus:outline-none w-20"
-                                    />
-                                    <button type="submit" className="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs px-3 py-1 rounded transition-colors">
-                                        Añadir
-                                    </button>
+                                <form onSubmit={handleAddMonth} className="flex flex-wrap gap-2 bg-slate-950 p-2 rounded-xl border border-slate-800">
+                                    <input type="text" placeholder="Mes" value={newMonth.id} onChange={(e) => setNewMonth({...newMonth, id: e.target.value})} className="px-2 py-1 bg-slate-900 border border-slate-800 rounded text-xs text-white focus:outline-none w-20" />
+                                    <input type="number" placeholder="Laura €" value={newMonth.lauraCount || ""} onChange={(e) => setNewMonth({...newMonth, lauraCount: e.target.value})} className="px-2 py-1 bg-slate-900 border border-slate-800 rounded text-xs text-white focus:outline-none w-16" />
+                                    <input type="number" placeholder="Asier €" value={newMonth.asierCount || ""} onChange={(e) => setNewMonth({...newMonth, asierCount: e.target.value})} className="px-2 py-1 bg-slate-900 border border-slate-800 rounded text-xs text-white focus:outline-none w-16" />
+                                    <input type="number" placeholder="Plan €" value={newMonth.simulatedPlan || ""} onChange={(e) => setNewMonth({...newMonth, simulatedPlan: e.target.value})} className="px-2 py-1 bg-slate-900 border border-slate-800 rounded text-xs text-white focus:outline-none w-16" />
+                                    <button type="submit" className="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs px-2.5 py-1 rounded">Añadir</button>
                                 </form>
                             </div>
 
                             <div className="overflow-x-auto">
-                                <table className="w-full text-left text-xs border-collapse">
+                                <table className="w-full text-left text-xs">
                                     <thead>
-                                        <tr className="border-b border-slate-800 text-slate-400 bg-slate-950/40">
-                                            <th className="p-3">Mes/Período</th>
-                                            <th className="p-3">Aportación Laura</th>
-                                            <th className="p-3">Aportación Asier</th>
-                                            <th className="p-3">Total Mes Real</th>
-                                            <th className="p-3">Plan Objetivo</th>
-                                            <th className="p-3">Desviación</th>
-                                            <th className="p-3 text-right">Acciones</th>
+                                        <tr className="border-b border-slate-800 text-slate-400 bg-slate-950/50">
+                                            <th className="p-2.5">Mes</th>
+                                            <th className="p-2.5">Laura</th>
+                                            <th className="p-2.5">Asier</th>
+                                            <th className="p-2.5">Total Real</th>
+                                            <th className="p-2.5">Objetivo</th>
+                                            <th className="p-2.5">Desviación</th>
+                                            <th className="p-2.5 text-right">Acciones</th>
                                         </tr>
                                     </thead>
-                                    <tbody className="divide-y divide-slate-800/50">
-                                        {months.length === 0 ? (
-                                            <tr>
-                                                <td colSpan="7" className="p-4 text-center text-slate-500">No hay registros mensuales todavía. ¡Empieza añadiendo uno arriba!</td>
-                                            </tr>
-                                        ) : months.map(m => {
+                                    <tbody className="divide-y divide-slate-800/40">
+                                        {months.map(m => {
                                             const totalReal = m.lauraCount + m.asierCount;
                                             const dev = totalReal - m.simulatedPlan;
                                             return (
-                                                <tr key={m.id} className="hover:bg-slate-800/30 transition-colors">
-                                                    <td className="p-3 font-semibold text-white">{m.id}</td>
-                                                    <td className="p-3">
+                                                <tr key={m.id} className="hover:bg-slate-800/20">
+                                                    <td className="p-2.5 font-semibold text-white">{m.id}</td>
+                                                    <td className="p-2.5">
                                                         {editingMonth === m.id ? (
-                                                            <input type="number" className="p-1 bg-slate-950 border border-slate-700 rounded text-white w-20" value={editForm.lauraCount} onChange={(e) => setEditForm({...editForm, lauraCount: e.target.value})} />
-                                                        ) : `${m.lauraCount.toLocaleString()}€`}
+                                                            <input type="number" className="p-1 bg-slate-950 border border-slate-700 rounded text-white w-16" value={editForm.lauraCount} onChange={(e) => setEditForm({...editForm, lauraCount: e.target.value})} />
+                                                        ) : `${m.lauraCount}€`}
                                                     </td>
-                                                    <td className="p-3">
+                                                    <td className="p-2.5">
                                                         {editingMonth === m.id ? (
-                                                            <input type="number" className="p-1 bg-slate-950 border border-slate-700 rounded text-white w-20" value={editForm.asierCount} onChange={(e) => setEditForm({...editForm, asierCount: e.target.value})} />
-                                                        ) : `${m.asierCount.toLocaleString()}€`}
+                                                            <input type="number" className="p-1 bg-slate-950 border border-slate-700 rounded text-white w-16" value={editForm.asierCount} onChange={(e) => setEditForm({...editForm, asierCount: e.target.value})} />
+                                                        ) : `${m.asierCount}€`}
                                                     </td>
-                                                    <td className="p-3 font-medium text-slate-200">{totalReal.toLocaleString()}€</td>
-                                                    <td className="p-3">
+                                                    <td className="p-2.5 text-slate-300">{totalReal}€</td>
+                                                    <td className="p-2.5">
                                                         {editingMonth === m.id ? (
-                                                            <input type="number" className="p-1 bg-slate-950 border border-slate-700 rounded text-white w-20" value={editForm.simulatedPlan} onChange={(e) => setEditForm({...editForm, simulatedPlan: e.target.value})} />
-                                                        ) : `${m.simulatedPlan.toLocaleString()}€`}
+                                                            <input type="number" className="p-1 bg-slate-950 border border-slate-700 rounded text-white w-16" value={editForm.simulatedPlan} onChange={(e) => setEditForm({...editForm, simulatedPlan: e.target.value})} />
+                                                        ) : `${m.simulatedPlan}€`}
                                                     </td>
-                                                    <td className={`p-3 font-bold ${dev >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                                                        {dev >= 0 ? `+${dev.toLocaleString()}` : dev.toLocaleString()}€
+                                                    <td className={`p-2.5 font-bold ${dev >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                                                        {dev >= 0 ? `+${dev}` : dev}€
                                                     </td>
-                                                    <td className="p-3 text-right">
+                                                    <td className="p-2.5 text-right">
                                                         {editingMonth === m.id ? (
-                                                            <div className="flex justify-end gap-2">
-                                                                <button onClick={() => handleSaveEdit(m.id)} className="bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded text-[10px] hover:bg-emerald-500/30">OK</button>
-                                                                <button onClick={() => setEditingMonth(null)} className="bg-slate-700 text-slate-300 px-2 py-0.5 rounded text-[10px]">X</button>
+                                                            <div className="flex justify-end gap-1">
+                                                                <button onClick={() => handleSaveEdit(m.id)} className="bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded text-[10px]">OK</button>
+                                                                <button onClick={() => setEditingMonth(null)} className="bg-slate-700 text-slate-300 px-1.5 py-0.5 rounded text-[10px]">X</button>
                                                             </div>
                                                         ) : (
-                                                            <div className="flex justify-end gap-3 text-slate-400">
+                                                            <div className="flex justify-end gap-2 text-slate-400">
                                                                 <button onClick={() => startEditMonth(m)} className="hover:text-emerald-400"><Icons.Edit /></button>
-                                                                <button onClick={() => handleDeleteMonth(m.id)} className="hover:text-red-400"><Icons.Trash /></button>
+                                                                <button onClick={() => handleDeleteMonth(m.id)} className="hover:text-rose-400"><Icons.Trash /></button>
                                                             </div>
                                                         )}
                                                     </td>
@@ -556,61 +470,44 @@
                             </div>
                         </section>
 
-                        {/* SECCIÓN 4: HIPOTECA Y MUEBLES */}
+                        {/* HIPOTECA Y MUEBLES */}
                         <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                            {/* Simulador Hipoteca Francesa */}
                             <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
-                                <div className="flex items-center gap-2 mb-4">
+                                <div className="flex items-center gap-2 mb-3">
                                     <span className="p-1.5 bg-indigo-500/10 text-indigo-400 rounded-lg"><Icons.Calculator /></span>
-                                    <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400">Simulador Sistema Francés (Post-Entrega)</h3>
+                                    <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400">Simulador Sistema Francés</h3>
                                 </div>
-                                <div className="grid grid-cols-3 gap-3 mb-4">
-                                    <div>
-                                        <label className="block text-[10px] uppercase font-semibold text-slate-400 mb-1">Capital Hipoteca</label>
-                                        <input type="number" value={mortgage.capital} onChange={(e) => setMortgage({...mortgage, capital: parseFloat(e.target.value) || 0})} className="w-full text-xs px-2.5 py-2 bg-slate-950 border border-slate-800 rounded-lg text-white focus:outline-none" />
-                                    </div>
-                                    <div>
-                                        <label className="block text-[10px] uppercase font-semibold text-slate-400 mb-1">Interés Anual %</label>
-                                        <input type="number" step="0.1" value={mortgage.interest} onChange={(e) => setMortgage({...mortgage, interest: parseFloat(e.target.value) || 0})} className="w-full text-xs px-2.5 py-2 bg-slate-950 border border-slate-800 rounded-lg text-white focus:outline-none" />
-                                    </div>
-                                    <div>
-                                        <label className="block text-[10px] uppercase font-semibold text-slate-400 mb-1">Plazo (Años)</label>
-                                        <input type="number" value={mortgage.years} onChange={(e) => setMortgage({...mortgage, years: parseInt(e.target.value) || 0})} className="w-full text-xs px-2.5 py-2 bg-slate-950 border border-slate-800 rounded-lg text-white focus:outline-none" />
-                                    </div>
+                                <div className="grid grid-cols-3 gap-2 mb-3">
+                                    <input type="number" value={mortgage.capital} onChange={(e) => setMortgage({...mortgage, capital: parseFloat(e.target.value) || 0})} className="text-xs p-2 bg-slate-950 border border-slate-800 rounded-lg text-white" />
+                                    <input type="number" step="0.1" value={mortgage.interest} onChange={(e) => setMortgage({...mortgage, interest: parseFloat(e.target.value) || 0})} className="text-xs p-2 bg-slate-950 border border-slate-800 rounded-lg text-white" />
+                                    <input type="number" value={mortgage.years} onChange={(e) => setMortgage({...mortgage, years: parseInt(e.target.value) || 0})} className="text-xs p-2 bg-slate-950 border border-slate-800 rounded-lg text-white" />
                                 </div>
-                                <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 text-center">
-                                    <span className="text-xs text-slate-400">Cuota Mensual Estimada</span>
-                                    <p className="text-3xl font-extrabold text-indigo-400 mt-1">
-                                        {cuotaMensualHipoteca.toLocaleString('es-ES', { maximumFractionDigits: 2 })}€/mes
-                                    </p>
+                                <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 text-center">
+                                    <span className="text-[11px] text-slate-400">Cuota Mensual Estimada</span>
+                                    <p className="text-2xl font-extrabold text-indigo-400">{cuotaMensualHipoteca.toLocaleString('es-ES', { maximumFractionDigits: 2 })}€/mes</p>
                                 </div>
                             </div>
 
-                            {/* Presupuesto Decoración Muebles */}
-                            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 flex flex-col justify-between">
-                                <div>
-                                    <div className="flex justify-between items-center mb-4">
-                                        <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400">Presupuesto Decoración & Mobiliario</h3>
-                                        <span className="text-xs font-bold text-white bg-slate-950 px-2.5 py-1 rounded-full border border-slate-800">Total: {totalFurnitureCost.toLocaleString()}€</span>
-                                    </div>
-                                    <form onSubmit={handleAddFurniture} className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-3">
-                                        <input type="text" placeholder="Mueble/Estancia" value={newFurniture.item} onChange={(e) => setNewFurniture({...newFurniture, item: e.target.value})} className="px-2.5 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-xs text-white focus:outline-none" />
-                                        <input type="number" placeholder="Coste (€)" value={newFurniture.cost} onChange={(e) => setNewFurniture({...newFurniture, cost: e.target.value})} className="px-2.5 py-1.5 bg-slate-950 border border-slate-800 rounded-lg text-xs text-white focus:outline-none" />
-                                        <button type="submit" className="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs rounded-lg py-1.5 transition-colors">Añadir</button>
-                                    </form>
-                                    <div className="max-h-28 overflow-y-auto space-y-1">
-                                        {furniture.length === 0 ? <p className="text-[11px] text-slate-500">No hay mobiliario listado.</p> : 
-                                            furniture.map(f => (
-                                                <div key={f.id} className="flex justify-between items-center text-[11px] bg-slate-950 p-1.5 rounded border border-slate-800/80">
-                                                    <span className="text-slate-300">{f.item}</span>
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="font-bold text-white">{f.cost}€</span>
-                                                        <button onClick={() => handleDeleteFurniture(f.id)} className="text-red-400 hover:text-red-300"><Icons.Trash /></button>
-                                                    </div>
-                                                </div>
-                                            ))
-                                        }
-                                    </div>
+                            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
+                                <div className="flex justify-between items-center mb-3">
+                                    <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400">Presupuesto Mobiliario</h3>
+                                    <span className="text-xs font-bold text-white bg-slate-950 px-2 py-0.5 rounded border border-slate-800">Total: {totalFurnitureCost}€</span>
+                                </div>
+                                <form onSubmit={handleAddFurniture} className="grid grid-cols-3 gap-2 mb-3">
+                                    <input type="text" placeholder="Mueble" value={newFurniture.item} onChange={(e) => setNewFurniture({...newFurniture, item: e.target.value})} className="p-1.5 bg-slate-950 border border-slate-800 rounded-lg text-xs text-white" />
+                                    <input type="number" placeholder="Coste" value={newFurniture.cost} onChange={(e) => setNewFurniture({...newFurniture, cost: e.target.value})} className="p-1.5 bg-slate-950 border border-slate-800 rounded-lg text-xs text-white" />
+                                    <button type="submit" className="bg-indigo-600 text-white font-semibold text-xs rounded-lg py-1">Añadir</button>
+                                </form>
+                                <div className="max-h-24 overflow-y-auto space-y-1">
+                                    {furniture.map(f => (
+                                        <div key={f.id} className="flex justify-between items-center text-[11px] bg-slate-950 p-1.5 rounded border border-slate-800">
+                                            <span className="text-slate-300">{f.item}</span>
+                                            <div className="flex items-center gap-2">
+                                                <span className="font-bold text-white">{f.cost}€</span>
+                                                <button onClick={() => handleDeleteFurniture(f.id)} className="text-rose-400"><Icons.Trash /></button>
+                                            </div>
+                                        </div>
+                                    ))}
                                 </div>
                             </div>
                         </section>
@@ -619,8 +516,8 @@
             );
         }
 
-        // Renderizar la Aplicación en el DOM
-        const root = ReactWorld.createRoot || ReactDOM.createRoot(document.getElementById('root'));
+        // Renderizado Limpio en el DOM
+        const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(<App />);
     </script>
 </body>
