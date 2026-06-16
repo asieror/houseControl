@@ -1,9 +1,23 @@
 <!DOCTYPE html>
-<html lang="es" class="h-full bg-slate-900 text-slate-100">
+<html lang="es" class="h-full bg-slate-950 text-slate-100">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Vivienda Segura - Dashboard Lutxana 2028</title>
+    <title>Casa Control - Gestión de Gastos, Entrada e Hipoteca</title>
+    
+    <script>
+        (function() {
+            var originalWarn = console.warn;
+            console.warn = function() {
+                var message = Array.prototype.slice.call(arguments).join(' ');
+                if (message.indexOf('cdn.tailwindcss.com') !== -1 || message.indexOf('Babel transformer') !== -1) {
+                    return; 
+                }
+                originalWarn.apply(console, arguments);
+            };
+        })();
+    </script>
+
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -11,517 +25,2121 @@
             theme: {
                 extend: {
                     colors: {
-                        slate: {
-                            950: '#0f172a',
-                        }
+                        brand: { 50: '#f0f9ff', 100: '#e0f2fe', 500: '#0ea5e9', 600: '#0284c7', 700: '#0369a1', 900: '#0c4a6e' }
                     }
                 }
             }
         }
     </script>
-    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #0f172a; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #0ea5e9; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+        .animate-fadeIn { animation: fadeIn 0.4s ease-out forwards; }
+        @keyframes pulseGlow { 0%, 100% { transform: scale(1); opacity: 0.4; } 50% { transform: scale(1.15); opacity: 0.8; } }
+        .glowing-ring { animation: pulseGlow 2s infinite ease-in-out; }
+    </style>
+    
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/@babel/standalone@7.24.0/babel.min.js"></script>
+
     <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore-compat.js"></script>
-</head>
-<body class="h-full font-sans antialiased bg-slate-950 text-slate-100">
 
-    <div id="root" class="h-full"></div>
+    <script type="text/javascript" id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+</head>
+<body class="h-full antialiased text-slate-200 bg-slate-950">
+
+    <div id="root" class="min-h-screen flex flex-col bg-slate-950"></div>
 
     <script type="text/babel">
         /* @jsx React.createElement */
         /* @jsxFrag React.Fragment */
 
-        // --- CONFIGURACIÓN DE FIREBASE ---
-        const firebaseConfig = {
-          apiKey: "AIzaSyCLPhH1UmIrrv4K9CBnDzW47Kigt91FU8g",
-          authDomain: "housecontrol-2bace.firebaseapp.com",
-          projectId: "housecontrol-2bace",
-          storageBucket: "housecontrol-2bace.firebasestorage.app",
-          messagingSenderId: "655569001492",
-          appId: "1:655569001492:web:968b5c5fe7f418927e5b01"
-        };
+        const { useState, useEffect, useRef, useMemo } = React;
 
-        // Inicializar Firebase de forma segura
-        if (!firebase.apps.length) {
-            firebase.initializeApp(firebaseConfig);
-        }
+        // --- CONSTANTES Y DATOS POR DEFECTO ---
+        const DEFAULT_META_TOTAL = 66629.20;
+        const DEFAULT_METAS = [
+            { id: 'm1', label: '10% Entrada Piso', amount: 34870, completed: false, desc: 'Primer hito de reserva y firma de contrato (Ya pagado 10%, pendiente el otro 10%)' },
+            { id: 'm2', label: 'IVA & Gastos de Compra', amount: 27896, completed: false, desc: 'Gastos de gestoría, notaría e impuestos correspondientes (No financiados por hipoteca)' },
+            { id: 'm3', label: 'Personalización de Vivienda', amount: 3863.20, completed: false, desc: 'Mejoras y adaptaciones de acabados de la constructora' }
+        ];
+        const DEFAULT_SALDO_INICIAL = 8164.00;
 
-        const auth = firebase.auth();
-        const db = firebase.firestore();
-        const googleProvider = new firebase.auth.GoogleAuthProvider();
-
-        const ALLOWED_EMAILS = [
-            "asiorte@gmail.com", 
-            "lauramartinez2114@gmail.com",
-            "aonar97@gmail.com"
+        const DEFAULT_CONTRIBUTIONS = [
+            { id: "m1", name: "Marzo (Año 1)", laura: 1266, asier: 850, revolut: 8620, simulacion: 2012 },
+            { id: "m2", name: "Abril (Año 1)", laura: 1266, asier: 850, revolut: 9075, simulacion: 2009 },
+            { id: "m3", name: "Mayo (Año 1)", laura: 1266, asier: 850, revolut: 9531, simulacion: 2005 },
+            { id: "m4", name: "Junio (Año 1)", laura: 1266, asier: 850, revolut: 9986, simulacion: 2002 },
+            { id: "m5", name: "Julio (Año 1)", laura: 1266, asier: 850, revolut: 10442, simulacion: 1999 },
+            { id: "m6", name: "Agosto (Año 1)", laura: 1266, asier: 1200, revolut: 11210, simulacion: 1995 },
+            { id: "m7", name: "Septiembre (Año 1)", laura: 1266, asier: 1200, revolut: 11980, simulacion: 1991 },
+            { id: "m8", name: "Octubre (Año 1)", laura: 1266, asier: 1200, revolut: 12749, simulacion: 1988 },
+            { id: "m9", name: "Noviembre (Año 1)", laura: 1266, asier: 1200, revolut: 13519, simulacion: 1984 },
+            { id: "m10", name: "Diciembre (Año 1)", laura: 1266, asier: 1500, revolut: 14588, simulacion: 1980 },
+            { id: "m11", name: "Enero (Año 2)", laura: 1266, asier: 1500, revolut: 15657, simulacion: 1976 },
+            { id: "m12", name: "Febrero (Año 2)", laura: 1266, asier: 1500, revolut: 16726, simulacion: 1972 },
+            { id: "m13", name: "Marzo (Año 2)", laura: 800, asier: 1500, revolut: 16867, simulacion: 1749 },
+            { id: "m14", name: "Abril (Año 2)", laura: 800, asier: 1500, revolut: 17163, simulacion: 1746 },
+            { id: "m15", name: "Mayo (Año 2)", laura: 800, asier: 1500, revolut: 17460, simulacion: 1742 },
+            { id: "m16", name: "Junio (Año 2)", laura: 800, asier: 1500, revolut: 18001, simulacion: 1714 },
+            { id: "m17", name: "Julio (Año 2)", laura: 800, asier: 1500, revolut: 18801, simulacion: 1685 },
+            { id: "m18", name: "Agosto (Año 2)", laura: 800, asier: 2000, revolut: 19940, simulacion: 1527 },
+            { id: "m19", name: "Septiembre (Año 2)", laura: 800, asier: 1500, revolut: 20580, simulacion: 1450 },
+            { id: "m20", name: "Octubre (Año 2)", laura: 800, asier: 1500, revolut: 10531.27, simulacion: 1373 }
         ];
 
-        // --- ICONOS SVG COMPONENTES ---
-        const Icons = {
-            Lock: () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 15v2m0 0v2m0-2h2m-2 0H10m3.5-3.5a3.5 3.5 0 11-7 0 3.5 3.5 0 017 0zM17.4 10.5a6.5 6.5 0 00-12.8 0H17.4z"/></svg>,
-            Home: () => <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>,
-            TrendingUp: () => <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"/></svg>,
-            Scale: () => <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>,
-            Calendar: () => <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>,
-            Calculator: () => <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 11h.01M12 7h.01M15 11h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>,
-            Trash: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>,
-            Edit: () => <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+        const DEFAULT_FURNITURE_BUDGET = [
+            { id: 'f1', category: 'Cocina & Electrodomésticos', item: 'Frigorífico, horno, inducción y lavavajillas', amount: 4500, spent: 4500, status: 'Comprado', priority: 'Alta' },
+            { id: 'f2', category: 'Salón / Sala', item: 'Sofá chaise longue cómodo, mueble de TV y mesa de comedor', amount: 3300, spent: 0, status: 'Pendiente', priority: 'Alta' },
+            { id: 'f4', category: 'Dormitorios (Dos habitaciones)', item: 'Estructuras de cama, colchones y mesitas de noche', amount: 3800, spent: 0, status: 'Pendiente', priority: 'Alta' },
+            { id: 'f9', category: 'Armarios', item: 'Organización interior, baldas, cajoneras y pantaloneros', amount: 1500, spent: 0, status: 'Pendiente', priority: 'Alta' },
+            { id: 'f7', category: 'Baños', item: 'Mampara de cristal templado para uno de los dos baños', amount: 650, spent: 0, status: 'Pendiente', priority: 'Alta' },
+            { id: 'f5', category: 'Iluminación', item: 'Instalación de focos LED, lámparas decorativas y apliques', amount: 1200, spent: 0, status: 'Pendiente', priority: 'Alta' },
+            { id: 'f10', category: 'Entrada de la Casa', item: 'Mueble recibidor, espejo y perchero de bienvenida', amount: 500, spent: 0, status: 'Pendiente', priority: 'Media' },
+            { id: 'f8', category: 'Mudanza & Detalles', item: 'Cajas de embalar, transporte profesional e imprevistos', amount: 800, spent: 0, status: 'Pendiente', priority: 'Media' }
+        ];
+
+        // Cambia este objeto si necesitas inyectar tus claves directamente por código
+        const DEFAULT_FIREBASE_CREDENTIALS = {
+            apiKey: "AIzaSyCLPhH1UmIrrv4K9CBnDzW47Kigt91FU8g",
+            authDomain: "housecontrol-2bace.firebaseapp.com",
+            projectId: "housecontrol-2bace",
+            storageBucket: "housecontrol-2bace.firebasestorage.app",
+            messagingSenderId: "655569001492",
+            appId: "1:655569001492:web:968b5c5fe7f418927e5b01"
+        };
+
+        const SVGIcons = {
+            home: <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25" /></svg>,
+            wallet: <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M21 12a2.25 2.25 0 00-2.25-2.25H15a3 3 0 11-6 0H5.25A2.25 2.25 0 003 12m18 0v6a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 18v-6m18 0V9M3 12V9m18-3a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 003 6v3h18V6z" /></svg>,
+            hourglass: <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
+            scale: <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M12 3v18m0-18L7.5 7.5M12 3l4.5 4.5M21 12H3" /></svg>,
+            plus: <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor" className="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>,
+            trash: <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor" className="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" /></svg>,
+            edit: <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor" className="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" /></svg>,
+            save: <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor" className="w-4 h-4"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>,
+            settings: <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 011.37.49l1.296 2.247a1.125 1.125 0 01-.26 1.43l-1.003.828c-.293.241-.438.613-.43.992a7.723 7.723 0 010 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.954.26 1.43l-1.298 2.247a1.125 1.125 0 01-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.57 6.57 0 01-.22.128c-.331.183-.581.495-.644.869l-.213 1.28c-.09.543-.56.941-1.11.941h-2.594c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 01-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 01-1.369-.49l-1.297-2.247a1.125 1.125 0 01.26-1.43l1.004-.827c.292-.24.437-.613.43-.992a6.932 6.932 0 010-.255c.007-.378-.138-.75-.43-.991l-1.004-.827a1.125 1.125 0 01-.26-1.43l1.297-2.247a1.125 1.125 0 011.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.087.22-.128.332-.183.582-.495.644-.869l.214-1.28z" /><circle cx="12" cy="12" r="3" strokeLinecap="round" strokeLinejoin="round" /></svg>,
+            lock: <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" /></svg>,
+            google: <svg className="w-5 h-5" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.18 1-.78 1.85-1.63 2.42v2.77h2.64c1.63-1.5 2.56-3.7 2.56-6.3V12.25z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H3.18v2.84C5 20.53 8.26 23 12 23z" fill="#34A853"/><path d="M5.84 14.1c-.22-.66-.35-1.36-.35-2.1s.13-1.44.35-2.1V7.06H3.18C2.42 8.64 2 10.27 2 12s.42 3.36 1.18 4.94l3.1-2.42c-.2-.42-.34-.89-.44-1.42z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 8.26 1 5 3.47 3.18 7.06l3.48 2.84c.87-2.6 3.3-4.52 6.16-4.52z" fill="#EA4335"/></svg>
         };
 
         function App() {
-            // Estados de Autenticación
-            const [user, setUser] = React.useState(null);
-            const [pin, setPin] = React.useState("");
-            const [pinAuthenticated, setPinAuthenticated] = React.useState(false);
-            const [authError, setAuthError] = React.useState("");
+            const [currentTab, setCurrentTab] = useState('dashboard');
+            const [metaTotal, setMetaTotal] = useState(DEFAULT_META_TOTAL);
+            const [saldoInicial, setSaldoInicial] = useState(DEFAULT_SALDO_INICIAL);
+            const [contributions, setContributions] = useState(DEFAULT_CONTRIBUTIONS);
+            const [houseMetas, setHouseMetas] = useState(DEFAULT_METAS);
+            const [furnitureBudget, setFurnitureBudget] = useState(DEFAULT_FURNITURE_BUDGET);
+            
+            const [revolutCorrection, setRevolutCorrection] = useState(0.00); 
+            const [revolutCorrectionReason, setRevolutCorrectionReason] = useState("Ajuste inicial de saldo real de Revolut");
+            const [annualInterestRate, setAnnualInterestRate] = useState(1.15);
+            const [taxRatePercentage, setTaxRatePercentage] = useState(19.00);
+            const [reconciliationDate, setReconciliationDate] = useState("2026-06-01"); 
+            const [liveSeconds, setLiveSeconds] = useState(0); 
 
-            // Estados de la Aplicación
-            const [revolutBase, setRevolutBase] = React.useState(25000);
-            const [tin, setTin] = React.useState(3.5); 
-            const [daysElapsed, setDaysElapsed] = React.useState(30); 
+            const [lauraInitialPayment, setLauraInitialPayment] = useState(33000);
+            const [asierInitialPayment, setAsierInitialPayment] = useState(10000);
+            const [repaidToLaura, setRepaidToLaura] = useState(0);
 
-            // Estados de Equidad y Reembolsos
-            const initialLaura = 33000;
-            const initialAsier = 10000;
-            const [refunds, setRefunds] = React.useState([]);
-            const [newRefund, setNewRefund] = React.useState({ amount: "", description: "" });
+            const [user, setUser] = useState(null);
+            const [userEmail, setUserEmail] = useState("");
+            const [allowedEmails, setAllowedEmails] = useState(["asier@gmail.com", "laura@gmail.com"]);
+            const [familyPin, setFamilyPin] = useState("1234");
+            const [isAuthenticated, setIsAuthenticated] = useState(false);
+            
+            const [loginEmailInput, setLoginEmailInput] = useState("");
+            const [loginPasswordInput, setLoginPasswordInput] = useState("");
+            const [isRegisterMode, setIsRegisterMode] = useState(false);
+            const [loginPinInput, setLoginPinInput] = useState("");
+            const [loginError, setLoginError] = useState("");
 
-            // Estados del Historial Mensual (CRUD)
-            const [months, setMonths] = React.useState([]);
-            const [newMonth, setNewMonth] = React.useState({ id: "", lauraCount: 0, asierCount: 0, simulatedPlan: 1500 });
-            const [editingMonth, setEditingMonth] = React.useState(null);
-            const [editForm, setEditForm] = React.useState({ lauraCount: 0, asierCount: 0, simulatedPlan: 1500 });
+            const [targetMonthlySaving, setTargetMonthlySaving] = useState(2300);
+            const [interestRate, setInterestRate] = useState(3.00);
+            const [loanTermYears, setLoanTermYears] = useState(30);
 
-            // Estados de Simulación Hipoteca y Muebles
-            const [mortgage, setMortgage] = React.useState({ capital: 150000, interest: 3.0, years: 30 });
-            const [furniture, setFurniture] = React.useState([]);
-            const [newFurniture, setNewFurniture] = React.useState({ item: "", cost: "" });
+            const [firebaseConfig, setFirebaseConfig] = useState(() => {
+                try {
+                    const saved = localStorage.getItem('casa_firebase_config');
+                    return saved ? JSON.parse(saved) : DEFAULT_FIREBASE_CREDENTIALS;
+                } catch(e) {
+                    return DEFAULT_FIREBASE_CREDENTIALS;
+                }
+            });
+            const [firebaseStatus, setFirebaseStatus] = useState('demo');
+            const [firebaseConfigForm, setFirebaseConfigForm] = useState(DEFAULT_FIREBASE_CREDENTIALS);
+            const [firebaseError, setFirebaseError] = useState(null);
 
-            // --- MANEJO DE AUTENTICACIÓN ---
-            const handlePinSubmit = (e) => {
-                e.preventDefault();
-                if (pin === "1234") {
-                    setPinAuthenticated(true);
-                    setAuthError("");
+            const [tempCorrection, setTempCorrection] = useState("0.00");
+            const [tempCorrectionReason, setTempCorrectionReason] = useState("Ajuste inicial de saldo real de Revolut");
+            const [tempRepaidAmount, setTempRepaidAmount] = useState("0");
+            
+            const [editingMonth, setEditingMonth] = useState(null);
+            const [editForm, setEditForm] = useState({ name: "", laura: 0, asier: 0, revolut: 0, simulacion: 0 });
+            
+            const [newFurniture, setNewFurniture] = useState({ category: "", item: "", amount: 0, priority: "Media" });
+            
+            // Protección contra nulos al convertir a String
+            useEffect(() => {
+                setTempCorrection(String(revolutCorrection || 0));
+                setTempCorrectionReason(revolutCorrectionReason || "");
+                setTempRepaidAmount(String(repaidToLaura || 0));
+            }, [revolutCorrection, revolutCorrectionReason, repaidToLaura]);
+
+            const [notifications, setNotifications] = useState([]);
+            const addNotification = (message, type = 'success') => {
+                const id = Date.now();
+                setNotifications(prev => [...prev, { id, message, type }]);
+                setTimeout(() => {
+                    setNotifications(prev => prev.filter(n => n.id !== id));
+                }, 4000);
+            };
+
+            const dbRef = useRef(null);
+            const syncUnsubscribe = useRef(null);
+
+            useEffect(() => {
+                const interval = setInterval(() => {
+                    setLiveSeconds(prev => prev + 1);
+                }, 1000);
+                return () => clearInterval(interval);
+            }, []);
+
+            useEffect(() => {
+                if (firebaseConfig) {
+                    setFirebaseConfigForm(firebaseConfig);
+                    connectFirebase(firebaseConfig);
                 } else {
-                    setAuthError("PIN Local incorrecto.");
+                    loadLocalStorageData();
+                }
+                return () => {
+                    if (syncUnsubscribe.current) syncUnsubscribe.current();
+                };
+            }, []);
+
+            const loadLocalStorageData = () => {
+                const safeParse = (key, fallback) => {
+                    try {
+                        const val = localStorage.getItem(key);
+                        return val ? JSON.parse(val) : fallback;
+                    } catch(e) { return fallback; }
+                };
+
+                const localData = safeParse('casa_local_contributions', null);
+                const localMetas = safeParse('casa_local_metas', null);
+                const localFurniture = safeParse('casa_local_furniture', null);
+                const localEmails = safeParse('casa_local_allowed_emails', null);
+
+                const localMeta = localStorage.getItem('casa_local_meta');
+                const localSaldo = localStorage.getItem('casa_local_saldo');
+                const localCorr = localStorage.getItem('casa_local_revolut_correction');
+                const localReason = localStorage.getItem('casa_local_revolut_reason');
+                const localIntRate = localStorage.getItem('casa_local_revolut_intrate');
+                const localTaxRate = localStorage.getItem('casa_local_revolut_taxrate');
+                const localRecDate = localStorage.getItem('casa_local_revolut_recdate');
+                const localPin = localStorage.getItem('casa_local_family_pin');
+                const localLauraInit = localStorage.getItem('casa_local_laura_initial');
+                const localAsierInit = localStorage.getItem('casa_local_asier_initial');
+                const localRepaid = localStorage.getItem('casa_local_repaid_laura');
+
+                if (localData) setContributions(localData);
+                if (localMeta) setMetaTotal(parseFloat(localMeta));
+                if (localSaldo) setSaldoInicial(parseFloat(localSaldo));
+                if (localMetas) setHouseMetas(localMetas);
+                if (localFurniture) setFurnitureBudget(localFurniture);
+
+                if (localCorr) {
+                    setRevolutCorrection(parseFloat(localCorr));
+                    setTempCorrection(localCorr);
+                }
+                if (localReason) {
+                    setRevolutCorrectionReason(localReason);
+                    setTempCorrectionReason(localReason);
+                }
+                if (localIntRate) setAnnualInterestRate(parseFloat(localIntRate));
+                if (localTaxRate) setTaxRatePercentage(parseFloat(localTaxRate));
+                if (localRecDate) setReconciliationDate(localRecDate);
+                if (localEmails) setAllowedEmails(localEmails);
+                if (localPin) setFamilyPin(localPin);
+
+                if (localLauraInit) setLauraInitialPayment(parseFloat(localLauraInit));
+                if (localAsierInit) setAsierInitialPayment(parseFloat(localAsierInit));
+                if (localRepaid) {
+                    setRepaidToLaura(parseFloat(localRepaid));
+                    setTempRepaidAmount(localRepaid);
                 }
             };
 
-            const handleGoogleLogin = () => {
-                auth.signInWithPopup(googleProvider)
-                    .then((result) => {
-                        const email = result.user.email;
-                        if (ALLOWED_EMAILS.includes(email)) {
-                            setUser(result.user);
-                            setAuthError("");
-                            loadDataFromFirestore();
+            useEffect(() => {
+                if (window.MathJax && window.MathJax.typesetPromise) {
+                    try {
+                        window.MathJax.typesetPromise().catch((err) => console.log(err));
+                    } catch(e) {}
+                }
+            }, [currentTab, interestRate, loanTermYears, targetMonthlySaving]);
+
+            const connectFirebase = (config) => {
+                setFirebaseStatus('connecting');
+                setFirebaseError(null);
+                try {
+                    if (typeof firebase === 'undefined') {
+                        throw new Error('Las librerías de Firebase no están cargadas aún.');
+                    }
+
+                    let app;
+                    if (!firebase.apps.length) {
+                        app = firebase.initializeApp(config);
+                    } else {
+                        app = firebase.app();
+                    }
+
+                    const auth = firebase.auth();
+                    const db = firebase.firestore();
+                    dbRef.current = db;
+
+                    auth.onAuthStateChanged((firebaseUser) => {
+                        if (firebaseUser) {
+                            if (firebaseUser.email) {
+                                const emailLower = firebaseUser.email.toLowerCase();
+                                if (allowedEmails.includes(emailLower)) {
+                                    setUser(firebaseUser);
+                                    setUserEmail(firebaseUser.email);
+                                    setIsAuthenticated(true);
+                                    setFirebaseStatus('connected');
+                                } else {
+                                    setLoginError(`El email ${firebaseUser.email} no está en la lista de autorizados.`);
+                                    auth.signOut();
+                                    setIsAuthenticated(false);
+                                    setUser(null);
+                                }
+                            } else {
+                                setUser(firebaseUser);
+                                setIsAuthenticated(true);
+                                setFirebaseStatus('connected');
+                            }
                         } else {
-                            auth.signOut();
-                            setAuthError("Acceso denegado: Email no autorizado.");
+                            setUser(null);
+                            setIsAuthenticated(false);
+                        }
+                    });
+
+                    const appIdSlug = config.projectId || 'housecontrol-2bace';
+                    const pathConfig = db.collection('artifacts').doc(appIdSlug).collection('public').doc('data').collection('config').doc('meta_config');
+                    
+                    pathConfig.onSnapshot((docSnap) => {
+                        if (docSnap.exists) {
+                            const data = docSnap.data();
+                            if (data.metaTotal) setMetaTotal(data.metaTotal);
+                            if (data.saldoInicial) setSaldoInicial(data.saldoInicial);
+                            if (data.houseMetas) setHouseMetas(data.houseMetas);
+                            if (data.furnitureBudget) setFurnitureBudget(data.furnitureBudget);
+                            if (data.revolutCorrection !== undefined) setRevolutCorrection(data.revolutCorrection);
+                            if (data.revolutCorrectionReason !== undefined) setRevolutCorrectionReason(data.revolutCorrectionReason);
+                            if (data.annualInterestRate !== undefined) setAnnualInterestRate(data.annualInterestRate);
+                            if (data.taxRatePercentage !== undefined) setTaxRatePercentage(data.taxRatePercentage);
+                            if (data.reconciliationDate !== undefined) setReconciliationDate(data.reconciliationDate);
+                            if (data.allowedEmails !== undefined) setAllowedEmails(data.allowedEmails);
+                            if (data.familyPin !== undefined) setFamilyPin(data.familyPin);
+                            if (data.lauraInitialPayment !== undefined) setLauraInitialPayment(data.lauraInitialPayment);
+                            if (data.asierInitialPayment !== undefined) setAsierInitialPayment(data.asierInitialPayment);
+                            if (data.repaidToLaura !== undefined) setRepaidToLaura(data.repaidToLaura);
+                        }
+                    }, (error) => {
+                        console.warn("Fallo al leer config de Firestore, usando locales");
+                    });
+
+                    const contribCollection = db.collection('artifacts').doc(appIdSlug).collection('public').doc('data').collection('contributions');
+                    if (syncUnsubscribe.current) syncUnsubscribe.current();
+                    
+                    syncUnsubscribe.current = contribCollection.onSnapshot((querySnap) => {
+                        const list = [];
+                        querySnap.forEach((doc) => {
+                            list.push({ id: doc.id, ...doc.data() });
+                        });
+                        if (list.length > 0) {
+                            list.sort((a, b) => (a.order || 0) - (b.order || 0));
+                            setContributions(list);
+                        }
+                    }, (err) => {
+                        console.error("Error en Snapshot de contribuciones:", err);
+                        setFirebaseError("Firestore bloqueado. Activa el 'Modo de prueba' en las Reglas de tu base de datos.");
+                    });
+
+                } catch (error) {
+                    console.error("Error al inicializar Firebase SDK:", error);
+                    setFirebaseStatus('error');
+                    setFirebaseError(error.message || String(error));
+                    loadLocalStorageData();
+                    addNotification("Error conectando a Firebase, utilizando almacenamiento local seguro", "error");
+                }
+            };
+
+            const persistData = (updatedContribs, updatedMeta, updatedSaldo, updatedMetas, updatedFurniture, updatedCorr, updatedReason, updatedIntRate, updatedRecDate, updatedEmails, updatedPin, updatedLauraInit, updatedAsierInit, updatedRepaid, updatedTaxRate) => {
+                const mTotal = updatedMeta !== undefined ? updatedMeta : metaTotal;
+                const sInicial = updatedSaldo !== undefined ? updatedSaldo : saldoInicial;
+                const listContribs = updatedContribs !== undefined ? updatedContribs : contributions;
+                const hMetas = updatedMetas !== undefined ? updatedMetas : houseMetas;
+                const fBudget = updatedFurniture !== undefined ? updatedFurniture : furnitureBudget;
+                const rCorr = updatedCorr !== undefined ? updatedCorr : revolutCorrection;
+                const rReason = updatedReason !== undefined ? updatedReason : revolutCorrectionReason;
+                const aIntRate = updatedIntRate !== undefined ? updatedIntRate : annualInterestRate;
+                const tRate = updatedTaxRate !== undefined ? updatedTaxRate : taxRatePercentage;
+                const rDate = updatedRecDate !== undefined ? updatedRecDate : reconciliationDate;
+                const aEmails = updatedEmails !== undefined ? updatedEmails : allowedEmails;
+                const fPin = updatedPin !== undefined ? updatedPin : familyPin;
+                const lInit = updatedLauraInit !== undefined ? updatedLauraInit : lauraInitialPayment;
+                const aInit = updatedAsierInit !== undefined ? updatedAsierInit : asierInitialPayment;
+                const repaid = updatedRepaid !== undefined ? updatedRepaid : repaidToLaura;
+
+                if (firebaseStatus === 'connected' && dbRef.current) {
+                    const appIdSlug = firebaseConfig.projectId || 'housecontrol-2bace';
+                    return dbRef.current.collection('artifacts').doc(appIdSlug).collection('public').doc('data').collection('config').doc('meta_config').set({
+                        metaTotal: mTotal,
+                        saldoInicial: sInicial,
+                        houseMetas: hMetas,
+                        furnitureBudget: fBudget,
+                        revolutCorrection: rCorr,
+                        revolutCorrectionReason: rReason,
+                        annualInterestRate: aIntRate,
+                        taxRatePercentage: tRate,
+                        reconciliationDate: rDate,
+                        allowedEmails: aEmails,
+                        familyPin: fPin,
+                        lauraInitialPayment: lInit,
+                        asierInitialPayment: aInit,
+                        repaidToLaura: repaid
+                    }).then(() => {
+                        const batch = dbRef.current.batch();
+                        listContribs.forEach((month, i) => {
+                            const docRef = dbRef.current.collection('artifacts').doc(appIdSlug).collection('public').doc('data').collection('contributions').doc(month.id);
+                            batch.set(docRef, {
+                                name: month.name,
+                                laura: Number(month.laura),
+                                asier: Number(month.asier),
+                                revolut: Number(month.revolut),
+                                simulacion: Number(month.simulacion),
+                                order: i
+                            });
+                        });
+                        return batch.commit();
+                    }).catch((err) => {
+                        console.error("Error persistiendo datos en Firebase:", err);
+                    });
+                } else {
+                    localStorage.setItem('casa_local_contributions', JSON.stringify(listContribs));
+                    localStorage.setItem('casa_local_meta', String(mTotal));
+                    localStorage.setItem('casa_local_saldo', String(sInicial));
+                    localStorage.setItem('casa_local_metas', JSON.stringify(hMetas));
+                    localStorage.setItem('casa_local_furniture', JSON.stringify(fBudget));
+                    localStorage.setItem('casa_local_revolut_correction', String(rCorr));
+                    localStorage.setItem('casa_local_revolut_reason', rReason);
+                    localStorage.setItem('casa_local_revolut_intrate', String(aIntRate));
+                    localStorage.setItem('casa_local_revolut_taxrate', String(tRate));
+                    localStorage.setItem('casa_local_revolut_recdate', rDate);
+                    localStorage.setItem('casa_local_allowed_emails', JSON.stringify(aEmails));
+                    localStorage.setItem('casa_local_family_pin', fPin);
+                    localStorage.setItem('casa_local_laura_initial', String(lInit));
+                    localStorage.setItem('casa_local_asier_initial', String(aInit));
+                    localStorage.setItem('casa_local_repaid_laura', String(repaid));
+                    return Promise.resolve();
+                }
+            };
+
+            const saveBalanceAdjustment = () => {
+                const correctionNum = parseFloat(tempCorrection) || 0;
+                setRevolutCorrection(correctionNum);
+                setRevolutCorrectionReason(tempCorrectionReason);
+                persistData(contributions, metaTotal, saldoInicial, houseMetas, furnitureBudget, correctionNum, tempCorrectionReason);
+                addNotification("Ajuste de balance guardado con éxito");
+            };
+
+            const saveRepaidAmount = () => {
+                const repaidNum = parseFloat(tempRepaidAmount) || 0;
+                setRepaidToLaura(repaidNum);
+                persistData(contributions, metaTotal, saldoInicial, houseMetas, furnitureBudget, revolutCorrection, revolutCorrectionReason, annualInterestRate, reconciliationDate, allowedEmails, familyPin, lauraInitialPayment, asierInitialPayment, repaidNum);
+                addNotification("Historial de devolución actualizado");
+            };
+
+            const loginWithGoogle = () => {
+                setLoginError("");
+                if (typeof firebase === 'undefined') {
+                    setLoginError("Las librerías de Firebase no están listas.");
+                    return;
+                }
+                const provider = new firebase.auth.GoogleAuthProvider();
+                firebase.auth().signInWithPopup(provider)
+                    .then((result) => {
+                        const email = result.user.email ? result.user.email.toLowerCase() : "";
+                        if (allowedEmails.includes(email)) {
+                            setUser(result.user);
+                            setUserEmail(result.user.email);
+                            setIsAuthenticated(true);
+                            addNotification(`¡Bienvenido/a, ${result.user.displayName || 'Pareja'}!`);
+                        } else {
+                            setLoginError(`El email ${result.user.email} no está autorizado.`);
+                            firebase.auth().signOut();
+                            setIsAuthenticated(false);
+                            setUser(null);
                         }
                     })
-                    .catch((error) => {
-                        setAuthError("Error en Google Auth: " + error.message);
+                    .catch((err) => {
+                        console.error(err);
+                        setLoginError(`Fallo al iniciar sesión: ${err.message}. Recuerda activar Google Auth en Firebase.`);
                     });
             };
 
-            const handleLogout = () => {
-                auth.signOut().then(() => {
-                    setUser(null);
-                    setPinAuthenticated(false);
-                    setPin("");
+            const handleEmailPasswordAuth = (e) => {
+                e.preventDefault();
+                setLoginError("");
+                if (typeof firebase === 'undefined') {
+                    setLoginError("Las librerías de Firebase no están listas.");
+                    return;
+                }
+
+                const email = loginEmailInput.trim().toLowerCase();
+                const password = loginPasswordInput;
+
+                if (!allowedEmails.includes(email)) {
+                    setLoginError(`El email ${email} no está en la lista de autorizados.`);
+                    return;
+                }
+
+                if (isRegisterMode) {
+                    firebase.auth().createUserWithEmailAndPassword(email, password)
+                        .then((userCredential) => {
+                            addNotification("Cuenta de pareja creada con éxito");
+                            setIsAuthenticated(true);
+                        })
+                        .catch((err) => {
+                            setLoginError(err.message);
+                        });
+                } else {
+                    firebase.auth().signInWithEmailAndPassword(email, password)
+                        .then((userCredential) => {
+                            addNotification("Sesión iniciada con éxito");
+                            setIsAuthenticated(true);
+                        })
+                        .catch((err) => {
+                            if (err.code === 'auth/user-not-found') {
+                                setLoginError("Este correo no está registrado. Marca la casilla para registrarte.");
+                            } else {
+                                setLoginError(err.message);
+                            }
+                        });
+                }
+            };
+
+            const handlePinLogin = (e) => {
+                e.preventDefault();
+                setLoginError("");
+                if (loginPinInput === familyPin) {
+                    setIsAuthenticated(true);
+                    addNotification("Acceso autorizado con éxito");
+                    if (firebaseStatus !== 'connected' && dbRef.current) {
+                        firebase.auth().signInAnonymously().catch(err => console.log("Anónimo omitido:", err));
+                    }
+                } else {
+                    setLoginError("PIN incorrecto. Vuelve a intentarlo.");
+                }
+            };
+
+            const logout = () => {
+                if (typeof firebase !== 'undefined' && firebase.auth) {
+                    firebase.auth().signOut();
+                }
+                setUser(null);
+                setIsAuthenticated(false);
+                setLoginPinInput("");
+                setLoginError("");
+                addNotification("Sesión cerrada", "info");
+            };
+
+            const uploadCurrentDataToFirebase = () => {
+                if (!dbRef.current) {
+                    addNotification("No conectado a Firebase.", "error");
+                    return;
+                }
+                addNotification("Sincronizando datos con la Nube...", "info");
+                persistData(contributions, metaTotal, saldoInicial, houseMetas, furnitureBudget, revolutCorrection, revolutCorrectionReason, annualInterestRate, reconciliationDate, allowedEmails, familyPin, lauraInitialPayment, asierInitialPayment, repaidToLaura, taxRatePercentage)
+                    .then(() => {
+                        addNotification("¡Todos tus datos han sido sincronizados y guardados en Firebase!", "success");
+                    })
+                    .catch((err) => {
+                        console.error("Error al inicializar base de datos:", err);
+                        addNotification("Error al escribir datos. Revisa las reglas de seguridad de Firestore.", "error");
+                    });
+            };
+
+            const processedData = useMemo(() => {
+                let currentAccumulated = saldoInicial;
+                let totalLaura = 0;
+                let totalAsier = 0;
+                let totalSimulacion = saldoInicial;
+
+                const rows = contributions.map((c) => {
+                    const totalMes = Number(c.laura) + Number(c.asier);
+                    currentAccumulated += totalMes;
+                    totalLaura += Number(c.laura);
+                    totalAsier += Number(c.asier);
+                    totalSimulacion += Number(c.simulacion || 0);
+
+                    const pendiente = Math.max(0, metaTotal - currentAccumulated);
+                    const d50_50 = totalLaura - totalAsier;
+                    const diferenciaVsPlan = currentAccumulated - totalSimulacion;
+
+                    return {
+                        ...c,
+                        totalMes,
+                        acumulado: currentAccumulated,
+                        pendiente,
+                        diferencia50_50: d50_50,
+                        totalLauraAcumulado: totalLaura,
+                        totalAsierAcumulado: totalAsier,
+                        simulacionAcumulado: totalSimulacion,
+                        diferenciaVsPlan
+                    };
+                });
+
+                const totalAhorrado = currentAccumulated;
+                const porcentajeProgreso = Math.min(100, (totalAhorrado / metaTotal) * 100);
+                
+                const lastMonthRevolutBase = contributions.length > 0 ? Number(contributions[contributions.length - 1].revolut) : saldoInicial;
+
+                const balanceAntesDeIntereses = lastMonthRevolutBase + revolutCorrection;
+
+                const lastDate = new Date(reconciliationDate || "2026-06-01");
+                const today = new Date();
+                const diffTime = Math.max(0, today - lastDate);
+                const diffDaysFloat = diffTime / (1000 * 60 * 60 * 24);
+                const diffDays = Math.floor(diffDaysFloat); 
+                
+                const r_diario = (annualInterestRate / 100) / 365;
+                const accumulatedInterestGross = balanceAntesDeIntereses * (Math.pow(1 + r_diario, diffDaysFloat) - 1);
+                
+                const taxFactor = taxRatePercentage / 100;
+                const accumulatedInterestRealTime = accumulatedInterestGross * (1 - taxFactor);
+
+                const interestPerDayGross = (balanceAntesDeIntereses + accumulatedInterestGross) * r_diario;
+                const interestPerDay = interestPerDayGross * (1 - taxFactor);
+                const taxWithheldPerDay = interestPerDayGross * taxFactor;
+
+                const saldoRevolutActual = balanceAntesDeIntereses + accumulatedInterestRealTime;
+
+                const totalMueblesPresupuesto = furnitureBudget.reduce((sum, item) => sum + item.amount, 0);
+                const totalMueblesGastado = furnitureBudget.reduce((sum, item) => sum + item.spent, 0);
+
+                const deudaInicialAsierALaura = (lauraInitialPayment - asierInitialPayment) / 2;
+                const deudaInicialPendiente = Math.max(0, deudaInicialAsierALaura - repaidToLaura);
+                const deudaMensualAsierALaura = (totalLaura - totalAsier) / 2;
+                const balanceConsolidadoAsierALaura = deudaInicialPendiente + deudaMensualAsierALaura;
+
+                return {
+                    rows,
+                    totalAhorrado,
+                    porcentajeProgreso,
+                    totalLaura,
+                    totalAsier,
+                    lastMonthRevolutBase,
+                    accumulatedInterestGross,
+                    accumulatedInterestRealTime,
+                    diffDays,
+                    interestPerDay,
+                    taxWithheldPerDay,
+                    saldoRevolutActual,
+                    totalSimulacion,
+                    totalMueblesPresupuesto,
+                    totalMueblesGastado,
+                    deudaInicialAsierALaura,
+                    deudaInicialPendiente,
+                    deudaMensualAsierALaura,
+                    balanceConsolidadoAsierALaura
+                };
+            }, [contributions, metaTotal, saldoInicial, furnitureBudget, reconciliationDate, annualInterestRate, taxRatePercentage, revolutCorrection, liveSeconds, lauraInitialPayment, asierInitialPayment, repaidToLaura]);
+
+            const projections = useMemo(() => {
+                const restanteCasa = Math.max(0, metaTotal - processedData.totalAhorrado);
+                const restanteMuebles = Math.max(0, processedData.totalMueblesPresupuesto - processedData.totalMueblesGastado);
+                const totalRestanteProyectoCompleto = restanteCasa + restanteMuebles;
+
+                let actualMonthlyVelocity = 2300; 
+                if (contributions.length >= 3) {
+                    const last3 = contributions.slice(-3);
+                    const sum = last3.reduce((s, c) => s + Number(c.laura) + Number(c.asier), 0);
+                    actualMonthlyVelocity = sum / 3;
+                }
+
+                const mesesParaCasa = Math.ceil(restanteCasa / targetMonthlySaving);
+                const mesesParaCompleto = Math.ceil(totalRestanteProyectoCompleto / targetMonthlySaving);
+
+                const hoy = new Date();
+                const fechaCasa = new Date(hoy.getFullYear(), hoy.getMonth() + mesesParaCasa, 1);
+                const fechaCompleto = new Date(hoy.getFullYear(), hoy.getMonth() + mesesParaCompleto, 1);
+
+                const formatOptions = { month: 'long', year: 'numeric' };
+                const fechaCasaLabel = fechaCasa.toLocaleDateString('es-ES', formatOptions);
+                const fechaCompletoLabel = fechaCompleto.toLocaleDateString('es-ES', formatOptions);
+
+                return {
+                    restanteCasa,
+                    restanteMuebles,
+                    totalRestanteProyectoCompleto,
+                    actualMonthlyVelocity,
+                    mesesParaCasa,
+                    mesesParaCompleto,
+                    fechaCasaLabel,
+                    fechaCompletoLabel
+                };
+            }, [processedData, targetMonthlySaving, metaTotal, contributions]);
+
+            const hipotecaData = useMemo(() => {
+                const valorVivienda = 348700;
+                const prestamoHipotecario = valorVivienda * 0.8; 
+                
+                const r = (interestRate / 100) / 12;
+                const n = loanTermYears * 12;
+                
+                let cuotaMensual = 0;
+                if (r > 0) {
+                    cuotaMensual = (prestamoHipotecario * r * Math.pow(1 + r, n)) / (Math.pow(1 + r, n) - 1);
+                } else {
+                    cuotaMensual = prestamoHipotecario / n;
+                }
+
+                const totalPagado = cuotaMensual * n;
+                const totalIntereses = totalPagado - prestamoHipotecario;
+
+                return {
+                    valorVivienda,
+                    prestamoHipotecario,
+                    cuotaMensual,
+                    totalPagado,
+                    totalIntereses
+                };
+            }, [interestRate, loanTermYears]);
+
+            const startEdit = (month) => {
+                setEditingMonth(month.id);
+                setEditForm({
+                    name: month.name,
+                    laura: month.laura,
+                    asier: month.asier,
+                    revolut: month.revolut,
+                    simulacion: month.simulacion
                 });
             };
 
-            // --- PERSISTENCIA FIRESTORE ---
-            const loadDataFromFirestore = () => {
-                db.collection("vivienda_segura").doc("dashboard").get()
-                    .then((doc) => {
-                        if (doc.exists) {
-                            const data = doc.data();
-                            if (data.revolutBase !== undefined) setRevolutBase(data.revolutBase);
-                            if (data.tin !== undefined) setTin(data.tin);
-                            if (data.daysElapsed !== undefined) setDaysElapsed(data.daysElapsed);
-                            if (data.refunds !== undefined) setRefunds(data.refunds);
-                            if (data.months !== undefined) setMonths(data.months);
-                            if (data.mortgage !== undefined) setMortgage(data.mortgage);
-                            if (data.furniture !== undefined) setFurniture(data.furniture);
-                        } else {
-                            syncToFirestore({
-                                revolutBase: 25000, tin: 3.5, daysElapsed: 30,
-                                refunds: [], months: [], mortgage: { capital: 150000, interest: 3.0, years: 30 },
-                                furniture: []
+            const saveEdit = () => {
+                const updated = contributions.map(c => {
+                    if (c.id === editingMonth) {
+                        return {
+                            ...c,
+                            name: editForm.name,
+                            laura: Number(editForm.laura),
+                            asier: Number(editForm.asier),
+                            revolut: Number(editForm.revolut),
+                            simulacion: Number(editForm.simulacion)
+                        };
+                    }
+                    return c;
+                });
+                setContributions(updated);
+                setEditingMonth(null);
+                persistData(updated);
+                addNotification("Aportación mensual guardada");
+            };
+
+            const addNewMonth = () => {
+                const nextNum = contributions.length + 1;
+                const lastMonth = contributions[contributions.length - 1];
+                const newMonth = {
+                    id: 'm_' + Date.now(),
+                    name: `Mes ${nextNum}`,
+                    laura: lastMonth ? lastMonth.laura : 800,
+                    asier: lastMonth ? lastMonth.asier : 1500,
+                    revolut: lastMonth ? lastMonth.revolut + (lastMonth.laura + lastMonth.asier) : saldoInicial + 2300,
+                    simulacion: lastMonth ? lastMonth.simulacion : 1373
+                };
+                const updated = [...contributions, newMonth];
+                setContributions(updated);
+                persistData(updated);
+                addNotification("Fila de planificación mensual añadida");
+            };
+
+            const deleteMonth = (id) => {
+                if (window.confirm("¿Estás seguro de que quieres eliminar este mes del historial?")) {
+                    const updated = contributions.filter(c => c.id !== id);
+                    setContributions(updated);
+                    persistData(updated);
+                    addNotification("Mes eliminado del histórico", "info");
+                }
+            };
+
+            const addFurnitureItem = () => {
+                if (!newFurniture.category || !newFurniture.item || !newFurniture.amount) {
+                    addNotification("Completa todos los campos para añadir el mueble", "error");
+                    return;
+                }
+                const newItem = {
+                    id: 'f_' + Date.now(),
+                    category: newFurniture.category,
+                    item: newFurniture.item,
+                    amount: Number(newFurniture.amount),
+                    spent: 0,
+                    status: 'Pendiente',
+                    priority: newFurniture.priority
+                };
+                const updated = [...furnitureBudget, newItem];
+                setFurnitureBudget(updated);
+                persistData(contributions, metaTotal, saldoInicial, houseMetas, updated);
+                setNewFurniture({ category: "", item: "", amount: 0, priority: "Media" });
+                addNotification("Partida de mueble añadida con éxito");
+            };
+
+            const deleteFurnitureItem = (id) => {
+                const updated = furnitureBudget.filter(f => f.id !== id);
+                setFurnitureBudget(updated);
+                persistData(contributions, metaTotal, saldoInicial, houseMetas, updated);
+                addNotification("Partida presupuestaria eliminada");
+            };
+
+            const toggleFurnitureStatus = (id) => {
+                const updated = furnitureBudget.map(f => {
+                    if (f.id === id) {
+                        const newStatus = f.status === 'Comprado' ? 'Pendiente' : 'Comprado';
+                        return {
+                            ...f,
+                            status: newStatus,
+                            spent: newStatus === 'Comprado' ? f.amount : 0
+                        };
+                    }
+                    return f;
+                });
+                setFurnitureBudget(updated);
+                persistData(contributions, metaTotal, saldoInicial, houseMetas, updated);
+                addNotification("Estado de compra actualizado");
+            };
+
+            const updateFirebaseConfigInApp = (e) => {
+                e.preventDefault();
+                localStorage.setItem('casa_firebase_config', JSON.stringify(firebaseConfigForm));
+                setFirebaseConfig(firebaseConfigForm);
+                connectFirebase(firebaseConfigForm);
+            };
+
+            const resetToDefaultCredentials = () => {
+                localStorage.removeItem('casa_firebase_config');
+                setFirebaseConfigForm(DEFAULT_FIREBASE_CREDENTIALS);
+                setFirebaseConfig(DEFAULT_FIREBASE_CREDENTIALS);
+                connectFirebase(DEFAULT_FIREBASE_CREDENTIALS);
+                addNotification("Restaurado a credenciales por defecto", "info");
+            };
+
+            const handleCSVUpload = (e) => {
+                const file = e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    parseCSVData(event.target.result);
+                };
+                reader.readAsText(file);
+            };
+
+            const parseCSVData = (text) => {
+                try {
+                    const lines = text.split('\n');
+                    let parsedMeta = DEFAULT_META_TOTAL;
+                    let parsedSaldo = DEFAULT_SALDO_INICIAL;
+                    let parsedMetas = [...DEFAULT_METAS];
+                    const parsedMonthly = [];
+
+                    lines.forEach(line => {
+                        const cols = line.split(',');
+                        if (cols.length < 2) return;
+
+                        const cleanText = (str) => str ? str.trim().replace(/"/g, '') : '';
+                        const cleanNum = (str) => {
+                            if (!str) return 0;
+                            let val = str.trim().replace(/"/g, '').replace('€', '').replace(/\s/g, '');
+                            if (val.includes('.') && val.includes(',')) {
+                                val = val.replace(/\./g, '').replace(',', '.');
+                            } else if (val.includes(',')) {
+                                val = val.replace(',', '.');
+                            }
+                            return parseFloat(val) || 0;
+                        };
+
+                        const label = cleanText(cols[1]);
+                        const val = cols[2];
+
+                        if (label.includes("10% Entrada Piso")) parsedMetas[0].amount = cleanNum(val);
+                        else if (label.includes("IVA (Gastos)")) parsedMetas[1].amount = cleanNum(val);
+                        else if (label.includes("Personalización")) parsedMetas[2].amount = cleanNum(val);
+                        else if (label.includes("META TOTAL")) parsedMeta = cleanNum(val);
+                        else if (label.includes("Saldo Inicial Real")) parsedSaldo = cleanNum(val);
+
+                        const idx = parseInt(cols[0]);
+                        if (!isNaN(idx) && idx > 0 && cols.length >= 6) {
+                            parsedMonthly.push({
+                                id: 'm_imported_' + idx + '_' + Date.now(),
+                                name: cleanText(cols[1]),
+                                laura: cleanNum(cols[2]),
+                                asier: cleanNum(cols[3]),
+                                revolut: cleanNum(cols[5]),
+                                simulacion: cleanNum(cols[11]) || cleanNum(cols[4])
                             });
                         }
-                    })
-                    .catch((err) => console.error("Error cargando de Firestore: ", err));
-            };
+                    });
 
-            const syncToFirestore = (updatedFields) => {
-                db.collection("vivienda_segura").doc("dashboard").set(updatedFields, { merge: true })
-                    .then(() => console.log("Sincronizado con éxito"))
-                    .catch((err) => console.error("Error sincronizando: ", err));
-            };
-
-            React.useEffect(() => {
-                if (user) {
-                    const timer = setTimeout(() => {
-                        syncToFirestore({ revolutBase, tin, daysElapsed, refunds, months, mortgage, furniture });
-                    }, 800);
-                    return () => clearTimeout(timer);
+                    if (parsedMonthly.length > 0) {
+                        setMetaTotal(parsedMeta);
+                        setSaldoInicial(parsedSaldo);
+                        setHouseMetas(parsedMetas);
+                        setContributions(parsedMonthly);
+                        persistData(parsedMonthly, parsedMeta, parsedSaldo, parsedMetas);
+                        addNotification("Carga de CSV completada", "success");
+                    }
+                } catch (err) {
+                    addNotification("Error procesando CSV", "error");
                 }
-            }, [revolutBase, tin, daysElapsed, refunds, months, mortgage, furniture, user]);
-
-            // --- LÓGICA DE NEGOCIO ---
-            const totalInteresesBrutos = revolutBase * Math.pow(1 + (tin / 100) / 365, daysElapsed) - revolutBase;
-            const irpfRetencion = totalInteresesBrutos * 0.19;
-            const revolutNeto = revolutBase + (totalInteresesBrutos - irpfRetencion);
-
-            const totalRefunds = refunds.reduce((acc, curr) => acc + parseFloat(curr.amount || 0), 0);
-            const deudaInicialAsier = (initialLaura - initialAsier) / 2;
-            const deudaActualAsier = deudaInicialAsier - totalRefunds;
-
-            // Handlers CRUD Mensual
-            const handleAddMonth = (e) => {
-                e.preventDefault();
-                if (!newMonth.id) return;
-                const updatedMonths = [...months, { ...newMonth, lauraCount: parseFloat(newMonth.lauraCount || 0), asierCount: parseFloat(newMonth.asierCount || 0), simulatedPlan: parseFloat(newMonth.simulatedPlan || 0) }];
-                setMonths(updatedMonths);
-                setNewMonth({ id: "", lauraCount: 0, asierCount: 0, simulatedPlan: 1500 });
             };
 
-            const startEditMonth = (m) => {
-                setEditingMonth(m.id);
-                setEditForm({ lauraCount: m.lauraCount, asierCount: m.asierCount, simulatedPlan: m.simulatedPlan });
-            };
-
-            const handleSaveEdit = (id) => {
-                const updatedMonths = months.map(m => m.id === id ? { ...m, lauraCount: parseFloat(editForm.lauraCount || 0), asierCount: parseFloat(editForm.asierCount || 0), simulatedPlan: parseFloat(editForm.simulatedPlan || 0) } : m);
-                setMonths(updatedMonths);
-                setEditingMonth(null);
-            };
-
-            const handleDeleteMonth = (id) => {
-                setMonths(months.filter(m => m.id !== id));
-            };
-
-            // Handlers Reembolsos Equidad
-            const handleAddRefund = (e) => {
-                e.preventDefault();
-                if (!newRefund.amount) return;
-                const updatedRefunds = [...refunds, { id: Date.now(), amount: parseFloat(newRefund.amount), description: newRefund.description, date: new Date().toLocaleDateString() }];
-                setRefunds(updatedRefunds);
-                setNewRefund({ amount: "", description: "" });
-            };
-
-            const handleDeleteRefund = (id) => {
-                setRefunds(refunds.filter(r => r.id !== id));
-            };
-
-            // Simulador Francés Hipoteca
-            const r_rate = (mortgage.interest / 100) / 12;
-            const n_months = mortgage.years * 12;
-            const cuotaMensualHipoteca = r_rate === 0 ? (mortgage.capital / n_months) : (mortgage.capital * r_rate * Math.pow(1 + r_rate, n_months)) / (Math.pow(1 + r_rate, n_months) - 1);
-
-            // Gestión Mobiliario
-            const handleAddFurniture = (e) => {
-                e.preventDefault();
-                if (!newFurniture.item || !newFurniture.cost) return;
-                const updated = [...furniture, { id: Date.now(), item: newFurniture.item, cost: parseFloat(newFurniture.cost) }];
-                setFurniture(updated);
-                setNewFurniture({ item: "", cost: "" });
-            };
-
-            const handleDeleteFurniture = (id) => {
-                setFurniture(furniture.filter(f => f.id !== id));
-            };
-            const totalFurnitureCost = furniture.reduce((acc, curr) => acc + curr.cost, 0);
-
-            // --- VISTAS DE RENDERIZADO ---
-            if (!user || !pinAuthenticated) {
+            if (!isAuthenticated) {
                 return (
-                    <div className="flex flex-col items-center justify-center min-h-screen px-4 bg-slate-950">
-                        <div className="w-full max-w-md p-8 rounded-2xl bg-slate-900 border border-slate-800 shadow-2xl">
-                            <div className="flex flex-col items-center mb-8">
-                                <div className="p-3 bg-emerald-500/10 text-emerald-400 rounded-xl mb-3">
-                                    <Icons.Home />
+                    <div className="min-h-screen flex items-center justify-center bg-slate-950 px-4 md:p-6">
+                        <div className="bg-slate-900 border border-slate-800/80 p-8 rounded-3xl max-w-md w-full shadow-2xl space-y-6 text-center animate-fadeIn">
+                            <div className="flex flex-col items-center gap-2">
+                                <div className="p-3.5 bg-gradient-to-tr from-cyan-600 to-indigo-500 rounded-2xl shadow-xl shadow-cyan-500/20 text-white">
+                                    {SVGIcons.lock}
                                 </div>
-                                <h1 className="text-2xl font-bold tracking-tight text-white">Vivienda Segura</h1>
-                                <p className="text-xs text-slate-400 mt-1">Dashboard de Ahorro - Lutxana 2028</p>
+                                <h1 className="text-2xl font-black text-white tracking-tight">Vivienda Segura</h1>
+                                <p className="text-xs text-slate-400">Control de la Entrada & Gastos del Piso</p>
                             </div>
 
-                            {authError && (
-                                <div className="p-3 mb-4 text-xs font-medium text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg">
-                                    {authError}
+                            {loginError && (
+                                <div className="bg-rose-500/10 border border-rose-500/25 p-3 rounded-xl text-xs text-rose-300 font-semibold text-left leading-relaxed">
+                                    {loginError}
                                 </div>
                             )}
 
-                            {!pinAuthenticated ? (
-                                <form onSubmit={handlePinSubmit} className="space-y-4">
-                                    <div>
-                                        <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">Paso 1: PIN de Acceso Común</label>
-                                        <input 
-                                            type="password" 
-                                            placeholder="Introduce el PIN" 
-                                            value={pin}
-                                            onChange={(e) => setPin(e.target.value)}
-                                            className="w-full px-4 py-3 bg-slate-950 border border-slate-800 rounded-xl text-center text-xl font-mono tracking-widest text-white focus:outline-none focus:border-emerald-500"
-                                        />
-                                    </div>
-                                    <button type="submit" className="w-full py-3 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-xl tracking-wide shadow-lg transition-all">
-                                        Validar PIN
-                                    </button>
-                                </form>
-                            ) : (
-                                <div className="space-y-4">
-                                    <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400 text-center mb-1">Paso 2: Autenticación Identificada</label>
+                            <form onSubmit={handlePinLogin} className="space-y-3">
+                                <label className="block text-left text-[10px] font-black text-slate-400 uppercase tracking-wider">Acceso rápido familiar por PIN</label>
+                                <input 
+                                    type="password" 
+                                    maxLength="10"
+                                    placeholder="Introduce el PIN de pareja..."
+                                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-center text-sm font-bold text-white tracking-widest placeholder-slate-600 focus:outline-none focus:border-cyan-500"
+                                    value={loginPinInput}
+                                    onChange={e => setLoginPinInput(e.target.value)}
+                                />
+                                <button type="submit" className="w-full bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-black py-3 rounded-xl transition shadow-lg shadow-cyan-500/20">
+                                    Validar PIN de Acceso
+                                </button>
+                            </form>
+
+                            <div className="relative flex py-2 items-center">
+                                <div className="flex-grow border-t border-slate-800/60"></div>
+                                <span className="flex-shrink mx-4 text-slate-500 text-[10px] font-black uppercase tracking-wider">o acceso por cuentas</span>
+                                <div className="flex-grow border-t border-slate-800/60"></div>
+                            </div>
+
+                            <form onSubmit={handleEmailPasswordAuth} className="space-y-3.5 text-left">
+                                <div>
+                                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Correo Electrónico Autorizado</label>
+                                    <input 
+                                        type="email" 
+                                        required
+                                        placeholder="ej: asier@gmail.com"
+                                        className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs font-semibold text-white placeholder-slate-700 focus:outline-none focus:border-cyan-500"
+                                        value={loginEmailInput}
+                                        onChange={e => setLoginEmailInput(e.target.value)}
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Contraseña secreta</label>
+                                    <input 
+                                        type="password" 
+                                        required
+                                        placeholder="Contraseña..."
+                                        className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs font-semibold text-white placeholder-slate-700 focus:outline-none focus:border-cyan-500"
+                                        value={loginPasswordInput}
+                                        onChange={e => setLoginPasswordInput(e.target.value)}
+                                    />
+                                </div>
+
+                                <button type="submit" className="w-full bg-slate-100 hover:bg-white text-slate-950 text-xs font-black py-3 rounded-xl transition shadow-lg">
+                                    {isRegisterMode ? "Crear Cuenta de Pareja" : "Iniciar Sesión"}
+                                </button>
+
+                                <div className="text-center mt-2">
                                     <button 
-                                        onClick={handleGoogleLogin}
-                                        className="w-full flex items-center justify-center gap-3 py-3 bg-white hover:bg-slate-100 text-slate-900 font-semibold rounded-xl shadow-md transition-all"
+                                        type="button" 
+                                        className="text-[11px] text-cyan-400 hover:underline"
+                                        onClick={() => setIsRegisterMode(!isRegisterMode)}
                                     >
-                                        <svg className="w-5 h-5" viewBox="0 0 24 24">
-                                            <path fill="#EA4335" d="M12.24 10.285V13.4h6.887c-.275 1.565-1.88 4.604-6.887 4.604-4.33 0-7.866-3.577-7.866-8s3.536-8 7.866-8c2.46 0 4.105 1.025 5.047 1.926l2.427-2.334C17.955 2.192 15.34 1 12.24 1 6.033 1 12.24 1 6.033 1 12.24s5.033 11.24 11.24 11.24c6.478 0 10.793-4.537 10.793-10.997 0-.746-.08-1.32-.176-1.883H12.24z"/>
-                                        </svg>
-                                        Acceder con Google Auth
+                                        {isRegisterMode ? "¿Ya tienes cuenta? Iniciar Sesión" : "¿No estás registrado? Crear Cuenta de Pareja"}
                                     </button>
                                 </div>
-                            )}
+                            </form>
+
+                            <div className="relative flex py-2 items-center">
+                                <div className="flex-grow border-t border-slate-800/60"></div>
+                                <span className="flex-shrink mx-4 text-slate-500 text-[10px] font-black uppercase tracking-wider">o</span>
+                                <div className="flex-grow border-t border-slate-800/60"></div>
+                            </div>
+
+                            <button 
+                                onClick={loginWithGoogle}
+                                className="w-full bg-slate-950 hover:bg-slate-850 text-white border border-slate-800 text-xs font-bold py-3.5 px-4 rounded-xl transition flex items-center justify-center gap-2.5 shadow-md"
+                            >
+                                {SVGIcons.google}
+                                Entrar con cuenta de Google
+                            </button>
                         </div>
                     </div>
                 );
             }
 
             return (
-                <div className="min-h-screen flex flex-col bg-slate-950 text-slate-100">
-                    <header className="border-b border-slate-800 bg-slate-900/50 backdrop-blur sticky top-0 z-50 px-6 py-4 flex flex-col sm:flex-row justify-between items-center gap-4">
-                        <div className="flex items-center gap-3">
-                            <span className="p-2 bg-emerald-500/10 text-emerald-400 rounded-lg"><Icons.Home /></span>
-                            <div>
-                                <h1 className="text-xl font-bold tracking-tight">Vivienda Segura 🏠</h1>
-                                <p className="text-xs text-slate-400">Ahorro Común · Piso en Lutxana 2028</p>
+                <div className="flex-1 flex flex-col min-h-screen animate-fadeIn">
+                    <header className="bg-slate-900 border-b border-slate-800 py-4 px-6 sticky top-0 z-40 shadow-xl">
+                        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
+                            <div className="flex items-center gap-4">
+                                <div className="p-3 bg-gradient-to-tr from-cyan-600 to-indigo-500 rounded-2xl shadow-lg shadow-indigo-500/20 text-white animate-fadeIn">
+                                    {SVGIcons.home}
+                                </div>
+                                <div>
+                                    <h1 className="text-xl font-extrabold tracking-tight text-white flex items-center gap-2">
+                                        Nuestra Casa <span className="text-[10px] uppercase font-black tracking-widest bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 px-2 py-0.5 rounded-md">Protected</span>
+                                    </h1>
+                                    <p className="text-xs text-slate-400">Panel financiero de Laura & Asier</p>
+                                </div>
                             </div>
-                        </div>
-                        <div className="flex items-center gap-4">
-                            <div className="text-right hidden sm:block">
-                                <p className="text-xs text-slate-400">Usuario Conectado</p>
-                                <p className="text-sm font-semibold text-emerald-400">{user.email}</p>
+
+                            <div className="flex flex-wrap items-center gap-3">
+                                {firebaseStatus === 'connected' ? (
+                                    <span className="flex items-center gap-1.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 px-3 py-1.5 rounded-xl text-xs font-bold animate-fadeIn">
+                                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                                        Nube Activa (housecontrol-2bace)
+                                    </span>
+                                ) : (
+                                    <span className="flex items-center gap-1.5 bg-rose-500/10 border border-rose-500/20 text-rose-400 px-3 py-1.5 rounded-xl text-xs font-bold animate-fadeIn">
+                                        <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse"></span>
+                                        Almacenamiento Local Seguro
+                                    </span>
+                                )}
+
+                                <button onClick={logout} className="bg-slate-800 hover:bg-slate-750 border border-slate-700 text-slate-300 text-xs px-3.5 py-1.5 rounded-xl font-bold transition flex items-center gap-1">
+                                    Cerrar Sesión
+                                </button>
                             </div>
-                            <button onClick={handleLogout} className="px-4 py-2 border border-slate-800 hover:bg-slate-800 text-xs font-semibold rounded-lg text-slate-300 transition-colors">
-                                Cerrar Sesión
-                            </button>
                         </div>
                     </header>
 
-                    <main className="flex-1 p-6 space-y-6 max-w-7xl mx-auto w-full">
-                        {/* REVOLUT CARD */}
-                        <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                            <div className="lg:col-span-1 bg-slate-900 border border-slate-800 rounded-2xl p-6 flex flex-col justify-between">
-                                <div>
-                                    <div className="flex justify-between items-center mb-4">
-                                        <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Fondo Común Revolut</span>
-                                        <span className="p-1.5 bg-sky-500/10 text-sky-400 rounded-lg"><Icons.TrendingUp /></span>
-                                    </div>
-                                    <p className="text-xs text-slate-400">Saldo Neto Estimado (IRPF 19%)</p>
-                                    <h2 className="text-4xl font-extrabold text-white tracking-tight mt-1">
-                                        {revolutNeto.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}€
-                                    </h2>
+                    <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-2 max-w-sm">
+                        {notifications.map(n => (
+                            <div key={n.id} className={`flex items-center gap-2.5 p-3.5 rounded-2xl shadow-2xl border text-sm font-semibold animate-fadeIn ${
+                                n.type === 'success' ? 'bg-emerald-950/95 text-emerald-300 border-emerald-500/30' :
+                                n.type === 'error' ? 'bg-rose-950/95 text-rose-300 border-rose-500/30' :
+                                'bg-slate-900/95 text-slate-200 border-slate-700'
+                            }`}>
+                                <span className="text-brand-400 shrink-0">{SVGIcons.save}</span>
+                                <span>{n.message}</span>
+                            </div>
+                        ))}
+                    </div>
+
+                    <div className="bg-slate-900/50 px-6 py-3 border-b border-slate-800">
+                        <div className="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
+                            <div className="w-full md:w-2/3 space-y-1">
+                                <div className="flex justify-between text-xs text-slate-400 font-bold">
+                                    <span>PROGRESO DE AHORRO DE LA ENTRADA (10% + Gastos e IVA)</span>
+                                    <span>{processedData.porcentajeProgreso.toFixed(1)}%</span>
                                 </div>
-                                <div className="mt-6 pt-4 border-t border-slate-800 grid grid-cols-2 gap-2 text-xs">
-                                    <div>
-                                        <span className="text-slate-400">Neto Generado:</span>
-                                        <p className="font-semibold text-emerald-400">+{ (totalInteresesBrutos - irpfRetencion).toFixed(2) }€</p>
-                                    </div>
-                                    <div>
-                                        <span className="text-slate-400">Retención (19%):</span>
-                                        <p className="font-semibold text-rose-400">-{ irpfRetencion.toFixed(2) }€</p>
-                                    </div>
+                                <div className="w-full bg-slate-850 rounded-full h-3.5 relative overflow-hidden p-0.5">
+                                    <div className="bg-gradient-to-r from-cyan-500 via-indigo-500 to-purple-500 h-full rounded-full transition-all duration-1000" style={{ width: `${processedData.porcentajeProgreso}%` }}></div>
                                 </div>
                             </div>
-
-                            <div className="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-2xl p-6">
-                                <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400 mb-4">Parámetros Cuenta de Ahorro</h3>
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                    <div>
-                                        <label className="block text-xs font-medium text-slate-400 mb-1">Capital Inicial (€)</label>
-                                        <input type="number" value={revolutBase} onChange={(e) => setRevolutBase(parseFloat(e.target.value) || 0)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-white focus:outline-none" />
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-medium text-slate-400 mb-1">TIN Nominal Anual (%)</label>
-                                        <input type="number" step="0.01" value={tin} onChange={(e) => setTin(parseFloat(e.target.value) || 0)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-white focus:outline-none" />
-                                    </div>
-                                    <div>
-                                        <label className="block text-xs font-medium text-slate-400 mb-1">Días Acumulados</label>
-                                        <input type="number" value={daysElapsed} onChange={(e) => setDaysElapsed(parseInt(e.target.value) || 0)} className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-white focus:outline-none" />
-                                    </div>
-                                </div>
+                            <div className="text-right shrink-0">
+                                <div className="text-lg font-black text-white">{processedData.totalAhorrado.toLocaleString('es-ES', { minimumFractionDigits: 2 })} €</div>
+                                <div className="text-[10px] text-slate-400 font-semibold uppercase">de un total necesario de {metaTotal.toLocaleString('es-ES')} €</div>
                             </div>
-                        </section>
+                        </div>
+                    </div>
 
-                        {/* EQUIDAD */}
-                        <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 flex flex-col justify-between">
-                                <div>
-                                    <div className="flex justify-between items-center mb-4">
-                                        <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Balance de Equidad (50/50)</span>
-                                        <span className="p-1.5 bg-amber-500/10 text-amber-400 rounded-lg"><Icons.Scale /></span>
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-2 mt-1 mb-4 text-xs">
-                                        <div className="bg-slate-950 p-2 rounded-lg border border-slate-800"><span className="text-slate-400">Laura:</span> <p className="font-bold text-white">33.000€</p></div>
-                                        <div className="bg-slate-950 p-2 rounded-lg border border-slate-800"><span className="text-slate-400">Asier:</span> <p className="font-bold text-white">10.000€</p></div>
-                                    </div>
-                                    <p className="text-xs text-slate-400">Deuda Restante de Asier</p>
-                                    <h2 className={`text-3xl font-extrabold tracking-tight mt-1 ${deudaActualAsier > 0 ? 'text-amber-400' : 'text-emerald-400'}`}>
-                                        {deudaActualAsier > 0 ? `${deudaActualAsier.toLocaleString('es-ES')}€` : '¡Saldado al 50%!'}
-                                    </h2>
-                                </div>
-                            </div>
+                    <main className="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+                        <div className="lg:col-span-3 flex flex-row lg:flex-col gap-1.5 overflow-x-auto pb-3 lg:pb-0 border-b lg:border-b-0 lg:border-r border-slate-800/60 lg:pr-4">
+                            <button onClick={() => setCurrentTab('dashboard')} className={`flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-bold uppercase tracking-wider transition shrink-0 ${currentTab === 'dashboard' ? 'bg-cyan-500/10 border border-cyan-500/20 text-cyan-400' : 'hover:bg-slate-900 text-slate-400'}`}>
+                                {SVGIcons.wallet} Cuenta Conjunta Revolut
+                            </button>
+                            <button onClick={() => setCurrentTab('simulation')} className={`flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-bold uppercase tracking-wider transition shrink-0 ${currentTab === 'simulation' ? 'bg-cyan-500/10 border border-cyan-500/20 text-cyan-400' : 'hover:bg-slate-900 text-slate-400'}`}>
+                                {SVGIcons.scale} Registro de Historial
+                            </button>
+                            <button onClick={() => setCurrentTab('projections')} className={`flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-bold uppercase tracking-wider transition shrink-0 ${currentTab === 'projections' ? 'bg-amber-500/10 border border-amber-500/20 text-amber-400' : 'hover:bg-slate-900 text-slate-400'}`}>
+                                {SVGIcons.hourglass} Proyección de Futuro
+                            </button>
+                            <button onClick={() => setCurrentTab('furniture')} className={`flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-bold uppercase tracking-wider transition shrink-0 ${currentTab === 'furniture' ? 'bg-pink-500/10 border border-pink-500/20 text-pink-400' : 'hover:bg-slate-900 text-slate-400'}`}>
+                                {SVGIcons.home} Presupuesto Muebles
+                            </button>
+                            <button onClick={() => setCurrentTab('mortgage')} className={`flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-bold uppercase tracking-wider transition shrink-0 ${currentTab === 'mortgage' ? 'bg-purple-500/10 border border-purple-500/20 text-purple-400' : 'hover:bg-slate-900 text-slate-400'}`}>
+                                {SVGIcons.save} Planificación Hipoteca
+                            </button>
+                            <button onClick={() => setCurrentTab('config')} className={`flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-bold uppercase tracking-wider transition shrink-0 ${currentTab === 'config' ? 'bg-slate-800 border border-slate-700 text-slate-200' : 'hover:bg-slate-900 text-slate-500'}`}>
+                                {SVGIcons.settings} Ajustes Nube & Auth
+                            </button>
+                        </div>
 
-                            <div className="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-2xl p-6">
-                                <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400 mb-4">Reembolsos a Laura</h3>
-                                <form onSubmit={handleAddRefund} className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
-                                    <input type="number" placeholder="Cantidad (€)" value={newRefund.amount} onChange={(e) => setNewRefund({...newRefund, amount: e.target.value})} className="px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-white text-sm focus:outline-none" />
-                                    <input type="text" placeholder="Concepto" value={newRefund.description} onChange={(e) => setNewRefund({...newRefund, description: e.target.value})} className="px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-white text-sm focus:outline-none" />
-                                    <button type="submit" className="bg-amber-600 hover:bg-amber-500 text-white font-semibold text-sm rounded-lg py-2 transition-colors">Registrar Pago</button>
-                                </form>
-                                <div className="max-h-32 overflow-y-auto space-y-1.5">
-                                    {refunds.map(r => (
-                                        <div key={r.id} className="flex justify-between items-center text-xs bg-slate-950 p-2 rounded-lg border border-slate-800">
-                                            <span><strong className="text-white">{r.amount}€</strong> - {r.description || 'Devolución'}</span>
-                                            <button onClick={() => handleDeleteRefund(r.id)} className="text-rose-400 hover:text-rose-300"><Icons.Trash /></button>
+                        <div className="lg:col-span-9 space-y-6">
+                            
+                            {currentTab === 'dashboard' && (
+                                <div className="space-y-6 animate-fadeIn">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                        <div className="bg-gradient-to-br from-slate-900 to-slate-950 p-6 rounded-3xl border border-slate-800 shadow-xl relative overflow-hidden group">
+                                            <div className="absolute right-0 bottom-0 translate-x-4 translate-y-4 w-28 h-28 bg-cyan-500/5 rounded-full group-hover:scale-125 transition duration-500"></div>
+                                            <div className="flex items-center justify-between mb-3">
+                                                <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Saldo Real Revolut</span>
+                                                <div className="p-2 bg-cyan-500/10 text-cyan-400 rounded-xl">{SVGIcons.wallet}</div>
+                                            </div>
+                                            <div className="text-3xl font-extrabold text-white">{processedData.saldoRevolutActual.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €</div>
+                                            <p className="text-[11px] text-cyan-400 font-semibold mt-2 flex items-center gap-1">
+                                                <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping"></span>
+                                                Saldo neto real (intereses compuestos aplicados)
+                                            </p>
                                         </div>
-                                    ))}
-                                </div>
-                            </div>
-                        </section>
 
-                        {/* HISTORIAL MENSUAL (CRUD) */}
-                        <section className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
-                            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
-                                <div className="flex items-center gap-2">
-                                    <span className="p-1.5 bg-emerald-500/10 text-emerald-400 rounded-lg"><Icons.Calendar /></span>
-                                    <h3 className="text-sm font-bold uppercase tracking-wider text-slate-300">Historial Mensual</h3>
-                                </div>
-                                <form onSubmit={handleAddMonth} className="flex flex-wrap gap-2 bg-slate-950 p-2 rounded-xl border border-slate-800">
-                                    <input type="text" placeholder="Mes" value={newMonth.id} onChange={(e) => setNewMonth({...newMonth, id: e.target.value})} className="px-2 py-1 bg-slate-900 border border-slate-800 rounded text-xs text-white focus:outline-none w-20" />
-                                    <input type="number" placeholder="Laura €" value={newMonth.lauraCount || ""} onChange={(e) => setNewMonth({...newMonth, lauraCount: e.target.value})} className="px-2 py-1 bg-slate-900 border border-slate-800 rounded text-xs text-white focus:outline-none w-16" />
-                                    <input type="number" placeholder="Asier €" value={newMonth.asierCount || ""} onChange={(e) => setNewMonth({...newMonth, asierCount: e.target.value})} className="px-2 py-1 bg-slate-900 border border-slate-800 rounded text-xs text-white focus:outline-none w-16" />
-                                    <input type="number" placeholder="Plan €" value={newMonth.simulatedPlan || ""} onChange={(e) => setNewMonth({...newMonth, simulatedPlan: e.target.value})} className="px-2 py-1 bg-slate-900 border border-slate-800 rounded text-xs text-white focus:outline-none w-16" />
-                                    <button type="submit" className="bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs px-2.5 py-1 rounded">Añadir</button>
-                                </form>
-                            </div>
+                                        <div className="bg-gradient-to-br from-slate-900 to-slate-950 p-6 rounded-3xl border border-slate-800 shadow-xl relative overflow-hidden group">
+                                            <div className="absolute right-0 bottom-0 translate-x-4 translate-y-4 w-28 h-28 bg-amber-500/5 rounded-full group-hover:scale-125 transition duration-500"></div>
+                                            <div className="flex items-center justify-between mb-3">
+                                                <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Pendiente Entrada</span>
+                                                <div className="p-2 bg-amber-500/10 text-amber-400 rounded-xl">{SVGIcons.hourglass}</div>
+                                            </div>
+                                            <div className="text-3xl font-extrabold text-white">{(Math.max(0, metaTotal - processedData.totalAhorrado)).toLocaleString('es-ES', { minimumFractionDigits: 2 })} €</div>
+                                            <p className="text-[11px] text-slate-400 mt-2">Para cubrir gastos, entrada e IVA</p>
+                                        </div>
 
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-left text-xs">
-                                    <thead>
-                                        <tr className="border-b border-slate-800 text-slate-400 bg-slate-950/50">
-                                            <th className="p-2.5">Mes</th>
-                                            <th className="p-2.5">Laura</th>
-                                            <th className="p-2.5">Asier</th>
-                                            <th className="p-2.5">Total Real</th>
-                                            <th className="p-2.5">Objetivo</th>
-                                            <th className="p-2.5">Desviación</th>
-                                            <th className="p-2.5 text-right">Acciones</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-slate-800/40">
-                                        {months.map(m => {
-                                            const totalReal = m.lauraCount + m.asierCount;
-                                            const dev = totalReal - m.simulatedPlan;
-                                            return (
-                                                <tr key={m.id} className="hover:bg-slate-800/20">
-                                                    <td className="p-2.5 font-semibold text-white">{m.id}</td>
-                                                    <td className="p-2.5">
-                                                        {editingMonth === m.id ? (
-                                                            <input type="number" className="p-1 bg-slate-950 border border-slate-700 rounded text-white w-16" value={editForm.lauraCount} onChange={(e) => setEditForm({...editForm, lauraCount: e.target.value})} />
-                                                        ) : `${m.lauraCount}€`}
-                                                    </td>
-                                                    <td className="p-2.5">
-                                                        {editingMonth === m.id ? (
-                                                            <input type="number" className="p-1 bg-slate-950 border border-slate-700 rounded text-white w-16" value={editForm.asierCount} onChange={(e) => setEditForm({...editForm, asierCount: e.target.value})} />
-                                                        ) : `${m.asierCount}€`}
-                                                    </td>
-                                                    <td className="p-2.5 text-slate-300">{totalReal}€</td>
-                                                    <td className="p-2.5">
-                                                        {editingMonth === m.id ? (
-                                                            <input type="number" className="p-1 bg-slate-950 border border-slate-700 rounded text-white w-16" value={editForm.simulatedPlan} onChange={(e) => setEditForm({...editForm, simulatedPlan: e.target.value})} />
-                                                        ) : `${m.simulatedPlan}€`}
-                                                    </td>
-                                                    <td className={`p-2.5 font-bold ${dev >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                                                        {dev >= 0 ? `+${dev}` : dev}€
-                                                    </td>
-                                                    <td className="p-2.5 text-right">
-                                                        {editingMonth === m.id ? (
-                                                            <div className="flex justify-end gap-1">
-                                                                <button onClick={() => handleSaveEdit(m.id)} className="bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded text-[10px]">OK</button>
-                                                                <button onClick={() => setEditingMonth(null)} className="bg-slate-700 text-slate-300 px-1.5 py-0.5 rounded text-[10px]">X</button>
-                                                            </div>
-                                                        ) : (
-                                                            <div className="flex justify-end gap-2 text-slate-400">
-                                                                <button onClick={() => startEditMonth(m)} className="hover:text-emerald-400"><Icons.Edit /></button>
-                                                                <button onClick={() => handleDeleteMonth(m.id)} className="hover:text-rose-400"><Icons.Trash /></button>
-                                                            </div>
-                                                        )}
-                                                    </td>
-                                                </tr>
-                                            );
-                                        })}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </section>
+                                        <div className="bg-gradient-to-br from-slate-900 to-slate-950 p-6 rounded-3xl border border-slate-800 shadow-xl relative overflow-hidden group">
+                                            <div className="absolute right-0 bottom-0 translate-x-4 translate-y-4 w-28 h-28 bg-pink-500/5 rounded-full group-hover:scale-125 transition duration-500"></div>
+                                            <div className="flex items-center justify-between mb-3">
+                                                <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Presupuesto Muebles</span>
+                                                <div className="p-2 bg-pink-500/10 text-pink-400 rounded-xl">{SVGIcons.home}</div>
+                                            </div>
+                                            <div className="text-3xl font-extrabold text-white">{(processedData.totalMueblesPresupuesto - processedData.totalMueblesGastado).toLocaleString('es-ES')} €</div>
+                                            <p className="text-[11px] text-pink-400 font-semibold mt-2">Ya pagado: {processedData.totalMueblesGastado.toLocaleString('es-ES')} €</p>
+                                        </div>
+                                    </div>
 
-                        {/* HIPOTECA Y MUEBLES */}
-                        <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
-                                <div className="flex items-center gap-2 mb-3">
-                                    <span className="p-1.5 bg-indigo-500/10 text-indigo-400 rounded-lg"><Icons.Calculator /></span>
-                                    <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400">Simulador Sistema Francés</h3>
-                                </div>
-                                <div className="grid grid-cols-3 gap-2 mb-3">
-                                    <input type="number" value={mortgage.capital} onChange={(e) => setMortgage({...mortgage, capital: parseFloat(e.target.value) || 0})} className="text-xs p-2 bg-slate-950 border border-slate-800 rounded-lg text-white" />
-                                    <input type="number" step="0.1" value={mortgage.interest} onChange={(e) => setMortgage({...mortgage, interest: parseFloat(e.target.value) || 0})} className="text-xs p-2 bg-slate-950 border border-slate-800 rounded-lg text-white" />
-                                    <input type="number" value={mortgage.years} onChange={(e) => setMortgage({...mortgage, years: parseInt(e.target.value) || 0})} className="text-xs p-2 bg-slate-950 border border-slate-800 rounded-lg text-white" />
-                                </div>
-                                <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 text-center">
-                                    <span className="text-[11px] text-slate-400">Cuota Mensual Estimada</span>
-                                    <p className="text-2xl font-extrabold text-indigo-400">{cuotaMensualHipoteca.toLocaleString('es-ES', { maximumFractionDigits: 2 })}€/mes</p>
-                                </div>
-                            </div>
-
-                            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6">
-                                <div className="flex justify-between items-center mb-3">
-                                    <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400">Presupuesto Mobiliario</h3>
-                                    <span className="text-xs font-bold text-white bg-slate-950 px-2 py-0.5 rounded border border-slate-800">Total: {totalFurnitureCost}€</span>
-                                </div>
-                                <form onSubmit={handleAddFurniture} className="grid grid-cols-3 gap-2 mb-3">
-                                    <input type="text" placeholder="Mueble" value={newFurniture.item} onChange={(e) => setNewFurniture({...newFurniture, item: e.target.value})} className="p-1.5 bg-slate-950 border border-slate-800 rounded-lg text-xs text-white" />
-                                    <input type="number" placeholder="Coste" value={newFurniture.cost} onChange={(e) => setNewFurniture({...newFurniture, cost: e.target.value})} className="p-1.5 bg-slate-950 border border-slate-800 rounded-lg text-xs text-white" />
-                                    <button type="submit" className="bg-indigo-600 text-white font-semibold text-xs rounded-lg py-1">Añadir</button>
-                                </form>
-                                <div className="max-h-24 overflow-y-auto space-y-1">
-                                    {furniture.map(f => (
-                                        <div key={f.id} className="flex justify-between items-center text-[11px] bg-slate-950 p-1.5 rounded border border-slate-800">
-                                            <span className="text-slate-300">{f.item}</span>
-                                            <div className="flex items-center gap-2">
-                                                <span className="font-bold text-white">{f.cost}€</span>
-                                                <button onClick={() => handleDeleteFurniture(f.id)} className="text-rose-400"><Icons.Trash /></button>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div className="bg-slate-900/60 p-5 rounded-3xl border border-slate-800 space-y-3 relative overflow-hidden group">
+                                            <div className="absolute right-0 bottom-0 translate-x-4 translate-y-4 w-24 h-24 bg-emerald-500/5 rounded-full"></div>
+                                            <div className="flex justify-between items-start">
+                                                <span className="text-[10px] uppercase font-black tracking-widest text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-md">Intereses Netos ({annualInterestRate}% TIN)</span>
+                                                <span className="text-[10px] text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded-md animate-pulse">
+                                                    +{processedData.interestPerDay.toLocaleString('es-ES', { minimumFractionDigits: 4, maximumFractionDigits: 4 })} €/día
+                                                </span>
+                                            </div>
+                                            <div className="text-2xl font-black text-white">{processedData.accumulatedInterestRealTime.toLocaleString('es-ES', { minimumFractionDigits: 5, maximumFractionDigits: 5 })} €</div>
+                                            
+                                            <div className="text-[10px] text-slate-400 space-y-1">
+                                                <div className="flex justify-between">
+                                                    <span>Bruto generado en {processedData.diffDays} días:</span>
+                                                    <span className="font-semibold text-slate-300">+{processedData.accumulatedInterestGross.toLocaleString('es-ES', { minimumFractionDigits: 4 })} €</span>
+                                                </div>
+                                                <div className="flex justify-between text-rose-400/80">
+                                                    <span>Retención IRPF ({taxRatePercentage}%):</span>
+                                                    <span>-{(processedData.accumulatedInterestGross * (taxRatePercentage/100)).toLocaleString('es-ES', { minimumFractionDigits: 4 })} €</span>
+                                                </div>
+                                                <div className="flex justify-between text-emerald-400 border-t border-slate-800/80 pt-1 mt-1 font-bold">
+                                                    <span>Interés Neto limpio acumulado:</span>
+                                                    <span>+{processedData.accumulatedInterestRealTime.toLocaleString('es-ES', { minimumFractionDigits: 4 })} €</span>
+                                                </div>
                                             </div>
                                         </div>
-                                    ))}
+
+                                        <div className="bg-slate-900/60 p-5 rounded-3xl border border-slate-800 space-y-3 relative overflow-hidden group">
+                                            <div className="absolute right-0 bottom-0 translate-x-4 translate-y-4 w-24 h-24 bg-cyan-500/5 rounded-full"></div>
+                                            <div className="flex justify-between items-start">
+                                                <span className="text-[10px] uppercase font-black tracking-widest text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded-md">Ajuste / Corrector de Balance</span>
+                                                <button onClick={saveBalanceAdjustment} className="text-[10px] font-black uppercase tracking-wider text-cyan-400 bg-cyan-500/10 border border-cyan-500/20 px-2.5 py-0.5 rounded-md hover:bg-cyan-500 hover:text-slate-950 transition flex items-center gap-1">
+                                                    {SVGIcons.save} Guardar Ajuste
+                                                </button>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-2 mt-2">
+                                                <div>
+                                                    <label className="block text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Importe corrector (€)</label>
+                                                    <input 
+                                                        type="text" 
+                                                        className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white text-xs font-bold focus:outline-none focus:border-cyan-500" 
+                                                        value={tempCorrection}
+                                                        onChange={e => setTempCorrection(e.target.value)} 
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Motivo / Explicación</label>
+                                                    <input 
+                                                        type="text" 
+                                                        className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2 text-white text-xs font-semibold focus:outline-none focus:border-cyan-500" 
+                                                        value={tempCorrectionReason}
+                                                        onChange={e => setTempCorrectionReason(e.target.value)} 
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="bg-slate-900/40 p-6 rounded-3xl border border-slate-800 shadow-xl space-y-4">
+                                        <div className="flex justify-between items-center">
+                                            <div>
+                                                <h3 className="text-sm font-bold text-white uppercase tracking-wider">Curva de Ahorro Real vs Simulación</h3>
+                                                <p className="text-xs text-slate-400">Trayectoria actual acumulada de vuestro plan</p>
+                                            </div>
+                                            <div className="flex items-center gap-4 text-xs font-bold">
+                                                <span className="flex items-center gap-1.5 text-cyan-400">
+                                                    <span className="w-3 h-3 rounded-full bg-cyan-500"></span> Real Acumulado
+                                                </span>
+                                                <span className="flex items-center gap-1.5 text-indigo-400">
+                                                    <span className="w-3 h-1.5 border-t-2 border-dashed border-indigo-400"></span> Simulación
+                                                </span>
+                                            </div>
+                                        </div>
+
+                                        <div className="w-full bg-slate-950/60 p-4 rounded-2xl border border-slate-800/80">
+                                            <ResponsiveSVGChart rows={processedData.rows} metaTotal={metaTotal} />
+                                        </div>
+                                    </div>
+
+                                    <div className="bg-slate-900/40 p-6 rounded-3xl border border-slate-800 space-y-6">
+                                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                            <div>
+                                                <h3 className="text-base font-extrabold text-white flex items-center gap-2">
+                                                    <span className="text-indigo-400">{SVGIcons.scale}</span>
+                                                    Acuerdo de Co-Inversión al 50/50 (Especial Entrada)
+                                                </h3>
+                                                <p className="text-xs text-slate-400">Control estricto para que vuestras aportaciones acumuladas estén siempre en armonía</p>
+                                            </div>
+
+                                            {processedData.balanceConsolidadoAsierALaura === 0 ? (
+                                                <span className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-bold px-3 py-1.5 rounded-full">Balance Perfecto</span>
+                                            ) : (
+                                                <span className="bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs font-bold px-3 py-1.5 rounded-full">
+                                                    Compensación Requerida
+                                                </span>
+                                            )}
+                                        </div>
+
+                                        <div className="bg-slate-950/80 p-5 rounded-2xl border border-slate-800/80 space-y-4">
+                                            <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+                                                <span className="w-2 h-2 rounded-full bg-amber-400"></span> Ajuste de Entrada del primer 10%
+                                            </h4>
+                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+                                                <div className="bg-slate-900/40 p-3.5 rounded-xl border border-slate-800">
+                                                    <span className="text-slate-400 font-bold block mb-1"> Laura aportó:</span>
+                                                    <strong className="text-lg font-black text-white">{lauraInitialPayment.toLocaleString('es-ES')} €</strong>
+                                                </div>
+                                                <div className="bg-slate-900/40 p-3.5 rounded-xl border border-slate-800">
+                                                    <span className="text-slate-400 font-bold block mb-1"> Asier aportó:</span>
+                                                    <strong className="text-lg font-black text-white">{asierInitialPayment.toLocaleString('es-ES')} €</strong>
+                                                </div>
+                                                <div className="bg-slate-900/40 p-3.5 rounded-xl border border-slate-800">
+                                                    <span className="text-slate-400 font-bold block mb-1"> Compensación Ideal:</span>
+                                                    <span className="block text-[10px] text-slate-500">Asier debe devolver originalmente a Laura:</span>
+                                                    <strong className="text-lg font-black text-amber-400">{processedData.deudaInicialAsierALaura.toLocaleString('es-ES')} €</strong>
+                                                </div>
+                                            </div>
+
+                                            <div className="p-4 bg-slate-900/60 rounded-xl border border-slate-850 flex flex-col md:flex-row items-center justify-between gap-4">
+                                                <div className="space-y-1">
+                                                    <span className="text-slate-300 font-extrabold text-xs block">¿Cuánto ha devuelto Asier a Laura poco a poco?</span>
+                                                    <p className="text-[10px] text-slate-500">Registra aquí la suma total que Asier le ha reembolsado ya a Laura directamente de la asimetría inicial.</p>
+                                                </div>
+                                                <div className="flex items-center gap-2 w-full md:w-auto shrink-0">
+                                                    <input 
+                                                        type="text" 
+                                                        className="bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs font-black text-white w-24 text-center focus:outline-none focus:border-cyan-500" 
+                                                        value={tempRepaidAmount}
+                                                        onChange={e => setTempRepaidAmount(e.target.value)}
+                                                    />
+                                                    <button onClick={saveRepaidAmount} className="bg-cyan-600 hover:bg-cyan-500 text-white text-[10px] font-black uppercase px-3 py-2 rounded-lg transition shrink-0 flex items-center gap-1">
+                                                        {SVGIcons.save} Actualizar
+                                                    </button>
+                                                </div>
+                                            </div>
+
+                                            <div className="flex justify-between items-center text-xs font-bold pt-1">
+                                                <span className="text-slate-400">Deuda por el pago del primer 10% pendiente de amortizar:</span>
+                                                <strong className="text-white bg-slate-900 px-3 py-1.5 rounded-lg border border-slate-800">
+                                                    {processedData.deudaInicialPendiente.toLocaleString('es-ES')} €
+                                                </strong>
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                            <div className="bg-slate-900/60 p-5 rounded-2xl border border-slate-800 relative">
+                                                <span className="absolute top-4 right-4 text-xs font-black text-pink-400 bg-pink-500/10 px-2 py-0.5 rounded-md">Laura</span>
+                                                <span className="text-xs font-bold text-slate-400">Ahorro Mensual Acumulado</span>
+                                                <div className="text-2xl font-black text-white mt-1">{processedData.totalLaura.toLocaleString('es-ES')} €</div>
+                                                <div className="mt-4 flex justify-between text-xs text-slate-400">
+                                                    <span>Nóminas en Revolut: {((processedData.totalLaura / (processedData.totalLaura + processedData.totalAsier || 1)) * 100).toFixed(1)}%</span>
+                                                </div>
+                                            </div>
+
+                                            <div className="bg-slate-900/60 p-5 rounded-2xl border border-slate-800 relative">
+                                                <span className="absolute top-4 right-4 text-xs font-black text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded-md">Asier</span>
+                                                <span className="text-xs font-bold text-slate-400">Ahorro Mensual Acumulado</span>
+                                                <div className="text-2xl font-black text-white mt-1">{processedData.totalAsier.toLocaleString('es-ES')} €</div>
+                                                <div className="mt-4 flex justify-between text-xs text-slate-400">
+                                                    <span>Nóminas en Revolut: {((processedData.totalAsier / (processedData.totalLaura + processedData.totalAsier || 1)) * 100).toFixed(1)}%</span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {processedData.balanceConsolidadoAsierALaura !== 0 && (
+                                            <div className="bg-indigo-500/5 border border-indigo-500/15 p-5 rounded-2xl space-y-3 text-xs">
+                                                <div className="flex items-center gap-3.5">
+                                                    <span className="p-2 bg-indigo-500/10 text-indigo-400 rounded-lg shrink-0">{SVGIcons.scale}</span>
+                                                    <div>
+                                                        <h4 className="font-extrabold text-white">Balance Neto Consolidado</h4>
+                                                        <p className="text-slate-400 text-[10px]">Cálculo integrado sumando el desequilibrio mensual y la deuda pendiente de la primera entrada.</p>
+                                                    </div>
+                                                </div>
+                                                <div className="bg-slate-950 p-4 rounded-xl border border-slate-900 leading-relaxed text-slate-300">
+                                                    {processedData.balanceConsolidadoAsierALaura > 0 ? (
+                                                        <p>
+                                                            Teniendo en cuenta el historial mensual y la diferencia del pago del primer hito, <strong className="text-indigo-400">Asier debe compensar un total neto de <span className="text-sm font-black text-indigo-300">{processedData.balanceConsolidadoAsierALaura.toLocaleString('es-ES', { minimumFractionDigits: 2 })} €</span> a Laura</strong> para estar en balance perfecto al 50/50.
+                                                        </p>
+                                                    ) : (
+                                                        <p>
+                                                            Teniendo en cuenta el historial mensual y la diferencia del pago del primer hito, <strong className="text-indigo-400">Laura debe compensar un total neto de <span className="text-sm font-black text-indigo-300">{Math.abs(processedData.balanceConsolidadoAsierALaura).toLocaleString('es-ES', { minimumFractionDigits: 2 })} €</span> a Asier</strong> para estar en balance perfecto al 50/50.
+                                                        </p>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
-                            </div>
-                        </section>
+                            )}
+
+                            {currentTab === 'simulation' && (
+                                <div className="space-y-6 animate-fadeIn">
+                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                        <div>
+                                            <h2 className="text-lg font-bold text-white">Historial de Depósitos Mensuales Conjuntos</h2>
+                                            <p className="text-xs text-slate-400 font-medium">Añade vuestras nóminas e ingresos mensuales directos.</p>
+                                        </div>
+                                        <button onClick={addNewMonth} className="flex items-center gap-2 bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-extrabold px-4 py-2.5 rounded-xl transition shadow-lg shadow-cyan-500/20 shrink-0">
+                                            {SVGIcons.plus} Registrar Mes
+                                        </button>
+                                    </div>
+
+                                    {editingMonth && (
+                                        <div className="bg-slate-900 border border-cyan-500/30 rounded-3xl p-5 space-y-4 shadow-xl">
+                                            <h3 className="font-bold text-cyan-400 flex items-center gap-1.5 text-sm">{SVGIcons.edit} Editar Mes Seleccionado</h3>
+                                            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                                                <div>
+                                                    <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Nombre</label>
+                                                    <input type="text" className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white text-xs font-bold" value={editForm.name} onChange={e => setEditForm({...editForm, name: e.target.value})} />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Laura (€)</label>
+                                                    <input type="number" className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white text-xs font-bold" value={editForm.laura} onChange={e => setEditForm({...editForm, laura: Number(e.target.value)})} />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Asier (€)</label>
+                                                    <input type="number" className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white text-xs font-bold" value={editForm.asier} onChange={e => setEditForm({...editForm, asier: Number(e.target.value)})} />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Saldo Revolut (€)</label>
+                                                    <input type="number" className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white text-xs font-bold" value={editForm.revolut} onChange={e => setEditForm({...editForm, revolut: Number(e.target.value)})} />
+                                                </div>
+                                                <div className="col-span-2 md:col-span-1">
+                                                    <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Plan Simulación (€)</label>
+                                                    <input type="number" className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white text-xs font-bold" value={editForm.simulacion} onChange={e => setEditForm({...editForm, simulacion: Number(e.target.value)})} />
+                                                </div>
+                                            </div>
+                                            <div className="flex justify-end gap-2">
+                                                <button onClick={() => setEditingMonth(null)} className="bg-slate-800 hover:bg-slate-700 text-slate-400 text-xs px-4 py-2 rounded-xl font-bold transition">Cancelar</button>
+                                                <button onClick={saveEdit} className="bg-cyan-600 hover:bg-cyan-500 text-white text-xs px-4 py-2 rounded-xl font-bold transition">Confirmar Datos</button>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    <div className="bg-slate-900/30 rounded-3xl border border-slate-800/80 overflow-hidden shadow-xl">
+                                        <div className="overflow-x-auto">
+                                            <table className="w-full border-collapse text-left text-xs">
+                                                <thead>
+                                                    <tr className="bg-slate-900 text-slate-400 font-extrabold border-b border-slate-800/80 uppercase tracking-widest text-[10px]">
+                                                        <th className="p-4">#</th>
+                                                        <th className="p-4">Mes</th>
+                                                        <th className="p-4 text-pink-400">Laura</th>
+                                                        <th className="p-4 text-blue-400">Asier</th>
+                                                        <th className="p-4">Total Ahorro</th>
+                                                        <th className="p-4 text-cyan-400">Saldo Revolut</th>
+                                                        <th className="p-4 text-indigo-400">Acumulado</th>
+                                                        <th className="p-4">Pendiente</th>
+                                                        <th className="p-4 text-right">Opciones</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-slate-900">
+                                                    {processedData.rows.map((row, index) => (
+                                                        <tr key={row.id} className="hover:bg-slate-900/40 transition">
+                                                            <td className="p-4 text-slate-600 font-bold">{index + 1}</td>
+                                                            <td className="p-4 font-bold text-white">{row.name}</td>
+                                                            <td className="p-4 text-pink-400 font-bold">{row.laura.toLocaleString('es-ES')} €</td>
+                                                            <td className="p-4 text-blue-400 font-bold">{row.asier.toLocaleString('es-ES')} €</td>
+                                                            <td className="p-4 font-extrabold text-slate-300">{(row.totalMes).toLocaleString('es-ES')} €</td>
+                                                            <td className="p-4 text-cyan-400 font-extrabold">{row.revolut.toLocaleString('es-ES')} €</td>
+                                                            <td className="p-4 text-indigo-400 font-black">{row.acumulado.toLocaleString('es-ES')} €</td>
+                                                            <td className="p-4 text-amber-500 font-bold">{row.pendiente.toLocaleString('es-ES')} €</td>
+                                                            <td className="p-4">
+                                                                <div className="flex justify-end gap-1.5">
+                                                                    <button onClick={() => startEdit(row)} className="p-1.5 bg-slate-800/60 hover:bg-cyan-500/10 text-slate-400 hover:text-cyan-400 rounded-lg transition">
+                                                                        {SVGIcons.edit}
+                                                                    </button>
+                                                                    <button onClick={() => deleteMonth(row.id)} className="p-1.5 bg-slate-800/60 hover:bg-rose-500/10 text-slate-400 hover:text-rose-400 rounded-lg transition">
+                                                                        {SVGIcons.trash}
+                                                                    </button>
+                                                                </div>
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {currentTab === 'projections' && (
+                                <div className="space-y-6 animate-fadeIn">
+                                    <div className="bg-gradient-to-tr from-amber-600/10 via-amber-600/5 to-transparent p-6 rounded-3xl border border-amber-500/20">
+                                        <div className="flex items-center gap-3 mb-2">
+                                            <div className="p-2.5 bg-amber-500/15 text-amber-400 rounded-2xl">{SVGIcons.hourglass}</div>
+                                            <div>
+                                                <h2 className="text-lg font-black text-white">El Rincón de la Tranquilidad</h2>
+                                                <p className="text-xs text-slate-400">Proyección de ahorro y cumplimiento de plazos para la firma de hipoteca en el Q3 de 2028</p>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="bg-slate-900/60 p-6 rounded-3xl border border-slate-800 space-y-6">
+                                        <div className="flex justify-between items-center">
+                                            <div>
+                                                <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
+                                                    <span className="inline-block w-2.5 h-2.5 rounded-full bg-cyan-400 animate-ping"></span>
+                                                    Cronología del Proyecto de Ahorro
+                                                </h3>
+                                                <p className="text-[11px] text-slate-400">Desde marzo de 2026 hasta el límite de firma en septiembre de 2028</p>
+                                            </div>
+                                            <span className="text-[10px] uppercase font-black tracking-widest text-slate-400 bg-slate-950/80 px-2.5 py-1 rounded-md border border-slate-800">
+                                                Fecha Límite: Q3 2028 (Sept 2028)
+                                            </span>
+                                        </div>
+
+                                        <div className="p-2 bg-slate-950/80 rounded-2xl border border-slate-900/60">
+                                            <ProjectTimeline 
+                                                contributions={contributions} 
+                                                processedData={processedData}
+                                                targetSaving={targetMonthlySaving}
+                                                metaTotal={metaTotal}
+                                                houseMetas={houseMetas}
+                                                saldoInicial={saldoInicial}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="bg-slate-900/60 p-6 rounded-3xl border border-slate-800 space-y-4">
+                                        <div className="flex justify-between items-center text-xs">
+                                            <span className="font-extrabold text-slate-400">Simulador de Ahorro Mensual Conjunto</span>
+                                            <span className="text-amber-400 font-black text-sm">{targetMonthlySaving.toLocaleString('es-ES')} €/mes</span>
+                                        </div>
+                                        <input 
+                                            type="range" 
+                                            min="1000" 
+                                            max="4500" 
+                                            step="100" 
+                                            value={targetMonthlySaving} 
+                                            onChange={e => setTargetMonthlySaving(Number(e.target.value))} 
+                                            className="w-full accent-amber-500 bg-slate-800 rounded-lg h-2 cursor-pointer"
+                                        />
+                                        <div className="flex justify-between text-[10px] text-slate-500 font-bold uppercase">
+                                            <span>Conservador (1.000 €)</span>
+                                            <span>Velocidad Actual aprox: ({projections.actualMonthlyVelocity.toFixed(0)} €)</span>
+                                            <span>Agresivo (4.500 €)</span>
+                                        </div>
+                                    </div>
+
+                                    <div className="bg-slate-900/30 p-5 rounded-2xl border border-slate-800/80 text-xs text-slate-300">
+                                        <h3 className="font-bold text-white mb-2 uppercase tracking-wide">Fórmula de Proyección de Tiempo</h3>
+                                        <p className="leading-relaxed mb-3">
+                                            El número de meses restantes para conseguir vuestro objetivo se calcula de forma dinámica mediante la siguiente relación matemática:
+                                        </p>
+                                        <div className="bg-slate-950 p-3 rounded-xl border border-slate-900 text-center text-sm font-semibold overflow-x-auto">
+                                            {"$$\\text{Meses Restantes} = \\left\\lceil \\frac{\\text{Meta de Ahorro} - \\text{Saldo Acumulado}}{\\text{Ahorro Objetivo Mensual}} \\right\\rceil$$"}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {currentTab === 'furniture' && (
+                                <div className="space-y-6 animate-fadeIn">
+                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                        <div>
+                                            <h2 className="text-lg font-bold text-white">Planificador de Muebles y Equipamiento Real</h2>
+                                            <p className="text-xs text-slate-400">Presupuesta y controla lo que costará vestir vuestra casa habitación por habitación con tus datos reales</p>
+                                        </div>
+                                        <div className="text-xs bg-pink-500/10 border border-pink-500/20 text-pink-400 px-3 py-1.5 rounded-xl font-bold">
+                                            Total Restante: {(processedData.totalMueblesPresupuesto - processedData.totalMueblesGastado).toLocaleString('es-ES')} €
+                                        </div>
+                                    </div>
+
+                                    <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 space-y-3.5">
+                                        <h3 className="font-bold text-white text-xs uppercase tracking-wider">Añadir Nueva Partida de Mueble / Decoración</h3>
+                                        <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                                            <input 
+                                                type="text" 
+                                                placeholder="Habitación / Categoría" 
+                                                className="bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs font-semibold text-white placeholder-slate-600 focus:outline-none focus:border-pink-500"
+                                                value={newFurniture.category}
+                                                onChange={e => setNewFurniture({...newFurniture, category: e.target.value})}
+                                            />
+                                            <input 
+                                                type="text" 
+                                                placeholder="Descripción del Elemento" 
+                                                className="bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs font-semibold text-white placeholder-slate-600 focus:outline-none focus:border-pink-500"
+                                                value={newFurniture.item}
+                                                onChange={e => setNewFurniture({...newFurniture, item: e.target.value})}
+                                            />
+                                            <input 
+                                                type="number" 
+                                                placeholder="Presupuesto Estimado (€)" 
+                                                className="bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs font-semibold text-white placeholder-slate-600 focus:outline-none focus:border-pink-500"
+                                                value={newFurniture.amount || ""}
+                                                onChange={e => setNewFurniture({...newFurniture, amount: Number(e.target.value)})}
+                                            />
+                                            <select 
+                                                className="bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs font-semibold text-white focus:outline-none focus:border-pink-500"
+                                                value={newFurniture.priority}
+                                                onChange={e => setNewFurniture({...newFurniture, priority: e.target.value})}
+                                            >
+                                                <option value="Alta">Prioridad: Alta</option>
+                                                <option value="Media">Prioridad: Media</option>
+                                                <option value="Baja">Prioridad: Baja</option>
+                                            </select>
+                                        </div>
+                                        <button onClick={addFurnitureItem} className="w-full bg-pink-600 hover:bg-pink-500 text-white text-xs font-extrabold py-2.5 rounded-xl transition shadow-lg shadow-pink-600/20">
+                                            Registrar Partida de Gasto
+                                        </button>
+                                    </div>
+
+                                    <div className="bg-slate-900/30 border border-slate-800 rounded-3xl overflow-hidden">
+                                        <div className="divide-y divide-slate-900">
+                                            {furnitureBudget.map((item) => (
+                                                <div key={item.id} className="p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 hover:bg-slate-900/40 transition">
+                                                    <div className="space-y-1">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-[10px] font-black uppercase bg-slate-850 px-2 py-0.5 rounded text-slate-400">{item.category}</span>
+                                                            <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded ${
+                                                                item.priority === 'Alta' ? 'bg-rose-500/10 text-rose-400' :
+                                                                item.priority === 'Media' ? 'bg-amber-500/10 text-amber-400' :
+                                                                'bg-slate-800 text-slate-500'
+                                                            }`}>Prioridad: {item.priority}</span>
+                                                            {item.status === 'Comprado' && (
+                                                                <span className="text-[10px] font-black uppercase bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded">PAGADO</span>
+                                                            )}
+                                                        </div>
+                                                        <h4 className="font-extrabold text-white text-xs">{item.item}</h4>
+                                                    </div>
+
+                                                    <div className="flex items-center gap-4 shrink-0">
+                                                        <div className="text-right">
+                                                            <div className="text-xs font-black text-white">{item.amount.toLocaleString('es-ES')} €</div>
+                                                            <span className="text-[10px] text-slate-500 font-bold uppercase">{item.status}</span>
+                                                        </div>
+
+                                                        <div className="flex gap-1.5">
+                                                            <button 
+                                                                onClick={() => toggleFurnitureStatus(item.id)} 
+                                                                className={`p-2 rounded-xl transition ${
+                                                                    item.status === 'Comprado' ? 'bg-emerald-500/15 text-emerald-400' : 'bg-slate-850 text-slate-400 hover:text-white'
+                                                                }`}
+                                                                title={item.status === 'Comprado' ? 'Marcar como Pendiente' : 'Marcar como Comprado'}
+                                                            >
+                                                                {SVGIcons.save}
+                                                            </button>
+                                                            <button onClick={() => deleteFurnitureItem(item.id)} className="p-2 bg-slate-850 hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 rounded-xl transition">
+                                                                {SVGIcons.trash}
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {currentTab === 'mortgage' && (
+                                <div className="space-y-6 animate-fadeIn">
+                                    <div className="bg-gradient-to-tr from-purple-600/10 via-purple-600/5 to-transparent p-6 rounded-3xl border border-purple-500/20">
+                                        <div className="flex items-center gap-3">
+                                            <div className="p-2.5 bg-purple-500/15 text-purple-400 rounded-2xl">{SVGIcons.home}</div>
+                                            <div>
+                                                <h2 className="text-lg font-black text-white">Simulador de Hipoteca & Viabilidad Financiera</h2>
+                                                <p className="text-xs text-slate-400">Analiza el impacto del préstamo hipotecario del piso en vuestra economía mensual familiar</p>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="bg-slate-900/30 p-5 rounded-2xl border border-slate-800/80 text-xs text-slate-300">
+                                        <h3 className="font-bold text-white mb-2 uppercase tracking-wide">Fórmula del Sistema de Amortización Francés</h3>
+                                        <p className="leading-relaxed mb-3">
+                                            {"La cuota mensual constante $M$ se calcula a partir del capital prestado $P$, el interés mensual $r = \\frac{\\text{TIN}}{12 \\times 100}$ y el número total de cuotas mensuales $n = \\text{Años} \\times 12$:"}
+                                        </p>
+                                        <div className="bg-slate-950 p-3 rounded-xl border border-slate-900 text-center text-sm font-semibold overflow-x-auto">
+                                            {"$$M = P \\cdot \\frac{r(1+r)^n}{(1+r)^n - 1}$$"}
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div className="bg-slate-900/60 p-5 rounded-2xl border border-slate-800 space-y-4">
+                                            <div className="flex justify-between items-center text-xs font-bold">
+                                                <span className="text-slate-400">Tipo de Interés Estimado (TIN)</span>
+                                                <span className="text-purple-400">{interestRate.toFixed(2)} %</span>
+                                            </div>
+                                            <input 
+                                                type="range" 
+                                                min="1.0" 
+                                                max="6.0" 
+                                                step="0.05" 
+                                                value={interestRate} 
+                                                onChange={e => setInterestRate(Number(e.target.value))} 
+                                                className="w-full accent-purple-500 bg-slate-800 rounded-lg h-2 cursor-pointer"
+                                            />
+                                        </div>
+
+                                        <div className="bg-slate-900/60 p-5 rounded-2xl border border-slate-800 space-y-4">
+                                            <div className="flex justify-between items-center text-xs font-bold">
+                                                <span className="text-slate-400">Plazo de Amortización</span>
+                                                <span className="text-purple-400">{loanTermYears} años</span>
+                                            </div>
+                                            <input 
+                                                type="range" 
+                                                min="10" 
+                                                max="35" 
+                                                step="1" 
+                                                value={loanTermYears} 
+                                                onChange={e => setLoanTermYears(Number(e.target.value))} 
+                                                className="w-full accent-purple-500 bg-slate-800 rounded-lg h-2 cursor-pointer"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                        <div className="bg-slate-900/40 p-5 rounded-2xl border border-slate-800">
+                                            <span className="text-[10px] text-slate-400 font-extrabold uppercase">Importe Financiado (80%)</span>
+                                            <div className="text-xl font-extrabold text-white mt-1">{hipotecaData.prestamoHipotecario.toLocaleString('es-ES')} €</div>
+                                            <p className="text-[10px] text-slate-500 mt-1">Precio total estimado: {hipotecaData.valorVivienda.toLocaleString('es-ES')} €</p>
+                                        </div>
+
+                                        <div className="bg-slate-900/40 p-5 rounded-2xl border border-slate-800">
+                                            <span className="text-[10px] text-slate-400 font-extrabold uppercase">Cuota Mensual Estimada</span>
+                                            <div className="text-2xl font-black text-purple-400 mt-1">{hipotecaData.cuotaMensual.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €</div>
+                                            <p className="text-[10px] text-slate-500 mt-1">Cuota dividida 50/50: {(hipotecaData.cuotaMensual / 2).toFixed(0)} € cada uno</p>
+                                        </div>
+
+                                        <div className="bg-slate-900/40 p-5 rounded-2xl border border-slate-800">
+                                            <span className="text-[10px] text-slate-400 font-extrabold uppercase">Total Intereses a Pagar</span>
+                                            <div className="text-xl font-extrabold text-white mt-1">{hipotecaData.totalIntereses.toLocaleString('es-ES', { minimumFractionDigits: 2 })} €</div>
+                                            <p className="text-[10px] text-slate-500 mt-1">Coste final del préstamo: {hipotecaData.totalPagado.toLocaleString('es-ES')} €</p>
+                                        </div>
+                                    </div>
+
+                                    <div className="bg-slate-900/30 p-5 rounded-3xl border border-slate-800 text-xs text-slate-300 space-y-3">
+                                        <h4 className="font-bold text-white uppercase tracking-wider">Regla del 30-35% de Endeudamiento Máximo</h4>
+                                        <p className="leading-relaxed">
+                                            Para que la hipoteca no ponga en aprietos vuestra economía familiar, la cuota mensual calculada de <strong className="text-purple-400">{hipotecaData.cuotaMensual.toFixed(0)} €</strong> no debería superar el <strong className="text-white">30% de vuestros ingresos netos mensuales conjuntos</strong>.
+                                        </p>
+                                        <div className="p-3 bg-slate-950 rounded-xl border border-slate-900 flex justify-between font-bold">
+                                            <span>Ingresos netos de pareja mínimos sugeridos:</span>
+                                            <span className="text-purple-400">{(hipotecaData.cuotaMensual / 0.3).toLocaleString('es-ES', { maximumFractionDigits: 0 })} € / mes</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {currentTab === 'config' && (
+                                <div className="space-y-6 animate-fadeIn">
+                                    <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 space-y-4 shadow-xl">
+                                        <h3 className="font-bold text-white text-sm flex items-center gap-1.5">
+                                            <span className="text-amber-400">{SVGIcons.scale}</span>
+                                            Configuración de Entrada Inicial (Primer 10%)
+                                        </h3>
+                                        <p className="text-xs text-slate-400 leading-relaxed">
+                                            Ajusta los depósitos iniciales para que la asimetría de inversión (Laura: 33.000 € vs. Asier: 10.000 €) quede registrada y se descuente poco a poco con tus devoluciones.
+                                        </p>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                            <div>
+                                                <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Primer Pago Laura (€)</label>
+                                                <input 
+                                                    type="number" 
+                                                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs font-bold text-white focus:outline-none focus:border-cyan-500" 
+                                                    value={lauraInitialPayment}
+                                                    onChange={e => {
+                                                        const val = parseFloat(e.target.value) || 0;
+                                                        setLauraInitialPayment(val);
+                                                        persistData(contributions, metaTotal, saldoInicial, houseMetas, furnitureBudget, revolutCorrection, revolutCorrectionReason, annualInterestRate, reconciliationDate, allowedEmails, familyPin, val, asierInitialPayment, repaidToLaura, taxRatePercentage);
+                                                    }}
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Primer Pago Asier (€)</label>
+                                                <input 
+                                                    type="number" 
+                                                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs font-bold text-white focus:outline-none focus:border-cyan-500" 
+                                                    value={asierInitialPayment}
+                                                    onChange={e => {
+                                                        const val = parseFloat(e.target.value) || 0;
+                                                        setAsierInitialPayment(val);
+                                                        persistData(contributions, metaTotal, saldoInicial, houseMetas, furnitureBudget, revolutCorrection, revolutCorrectionReason, annualInterestRate, reconciliationDate, allowedEmails, familyPin, lauraInitialPayment, val, repaidToLaura, taxRatePercentage);
+                                                    }}
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 space-y-4 shadow-xl">
+                                        <h3 className="font-bold text-white text-sm flex items-center gap-1.5">
+                                            <span className="text-cyan-400">{SVGIcons.lock}</span>
+                                            Gestión de Seguridad & Lista de Acceso
+                                        </h3>
+                                        <p className="text-xs text-slate-400 leading-relaxed">
+                                            Define qué cuentas de Google tienen permiso para acceder y editar vuestro Workspace. Cualquier otro email de Google será rechazado automáticamente.
+                                        </p>
+                                        <div className="space-y-3">
+                                            <div>
+                                                <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1.5">Correos Autorizados (Separados por comas)</label>
+                                                <input 
+                                                    type="text" 
+                                                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs font-semibold text-white tracking-wide placeholder-slate-600 focus:outline-none focus:border-cyan-500"
+                                                    value={allowedEmails.join(', ')} 
+                                                    onChange={e => {
+                                                        const clean = e.target.value.split(',').map(em => em.trim().toLowerCase()).filter(em => em.length > 0);
+                                                        setAllowedEmails(clean);
+                                                        persistData(contributions, metaTotal, saldoInicial, houseMetas, furnitureBudget, revolutCorrection, revolutCorrectionReason, annualInterestRate, reconciliationDate, clean, familyPin, lauraInitialPayment, asierInitialPayment, repaidToLaura, taxRatePercentage);
+                                                    }} 
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1.5">PIN Familiar Secreto (De respaldo)</label>
+                                                <input 
+                                                    type="text" 
+                                                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs font-black text-white tracking-widest placeholder-slate-600 focus:outline-none focus:border-cyan-500"
+                                                    value={familyPin} 
+                                                    onChange={e => {
+                                                        setFamilyPin(e.target.value);
+                                                        persistData(contributions, metaTotal, saldoInicial, houseMetas, furnitureBudget, revolutCorrection, revolutCorrectionReason, annualInterestRate, reconciliationDate, allowedEmails, e.target.value, lauraInitialPayment, asierInitialPayment, repaidToLaura, taxRatePercentage);
+                                                    }} 
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 space-y-4 shadow-xl">
+                                        <h3 className="font-bold text-white text-sm flex items-center gap-1.5">
+                                            <span className="text-emerald-400">{SVGIcons.wallet}</span>
+                                            Ajustes de Interés de Revolut & Retenciones Fiscales
+                                        </h3>
+                                        <p className="text-xs text-slate-400 leading-relaxed">
+                                            Define la tasa de interés anual, la retención fiscal obligatoria y la fecha de vuestro último cuadre oficial de saldo de Revolut:
+                                        </p>
+                                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                            <div>
+                                                <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Tasa de Interés Anual (TIN %)</label>
+                                                <input 
+                                                    type="number" 
+                                                    step="0.01"
+                                                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs font-bold text-white focus:outline-none focus:border-emerald-500" 
+                                                    value={annualInterestRate}
+                                                    onChange={e => {
+                                                        const val = Number(e.target.value);
+                                                        setAnnualInterestRate(val);
+                                                        persistData(contributions, metaTotal, saldoInicial, houseMetas, furnitureBudget, revolutCorrection, revolutCorrectionReason, val, reconciliationDate, allowedEmails, familyPin, lauraInitialPayment, asierInitialPayment, repaidToLaura, taxRatePercentage);
+                                                    }}
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Retención Fiscal (IRPF %)</label>
+                                                <input 
+                                                    type="number" 
+                                                    step="0.5"
+                                                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs font-bold text-white focus:outline-none focus:border-emerald-500" 
+                                                    value={taxRatePercentage}
+                                                    onChange={e => {
+                                                        const val = Number(e.target.value);
+                                                        setTaxRatePercentage(val);
+                                                        persistData(contributions, metaTotal, saldoInicial, houseMetas, furnitureBudget, revolutCorrection, revolutCorrectionReason, annualInterestRate, reconciliationDate, allowedEmails, familyPin, lauraInitialPayment, asierInitialPayment, repaidToLaura, val);
+                                                    }}
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Fecha de Última Conciliación</label>
+                                                <input 
+                                                    type="date" 
+                                                    className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs font-bold text-white focus:outline-none focus:border-emerald-500" 
+                                                    value={reconciliationDate}
+                                                    onChange={e => {
+                                                        setReconciliationDate(e.target.value);
+                                                        persistData(contributions, metaTotal, saldoInicial, houseMetas, furnitureBudget, revolutCorrection, revolutCorrectionReason, annualInterestRate, e.target.value, allowedEmails, familyPin, lauraInitialPayment, asierInitialPayment, repaidToLaura, taxRatePercentage);
+                                                    }}
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 space-y-4 shadow-xl">
+                                        <h3 className="font-bold text-white text-sm flex items-center gap-1.5">
+                                            <span className="text-cyan-400">{SVGIcons.settings}</span>
+                                            Panel de Diagnóstico de Conexión
+                                        </h3>
+                                        
+                                        <div className="space-y-3 text-xs">
+                                            <div className="flex items-center justify-between p-2.5 bg-slate-950 rounded-xl border border-slate-900">
+                                                <span className="text-slate-400 font-medium">1. SDK de Firebase en Navegador</span>
+                                                {typeof firebase !== 'undefined' ? (
+                                                    <span className="text-emerald-400 font-bold flex items-center gap-1">✓ Cargado</span>
+                                                ) : (
+                                                    <span className="text-rose-400 font-bold flex items-center gap-1">✗ Error</span>
+                                                )}
+                                            </div>
+
+                                            <div className="flex items-center justify-between p-2.5 bg-slate-950 rounded-xl border border-slate-900">
+                                                <span className="text-slate-400 font-medium">2. Estado de Sesión Protegida</span>
+                                                {isAuthenticated ? (
+                                                    <span className="text-emerald-400 font-bold flex items-center gap-1">✓ Sesión Iniciada ({userEmail || 'Mediante PIN'})</span>
+                                                ) : (
+                                                    <span className="text-rose-400 font-bold flex items-center gap-1">✗ No conectado</span>
+                                                )}
+                                            </div>
+
+                                            <div className="flex items-center justify-between p-2.5 bg-slate-950 rounded-xl border border-slate-800">
+                                                <span className="text-slate-400 font-medium">3. Sincronización en Tiempo Real</span>
+                                                {firebaseStatus === 'connected' ? (
+                                                    <span className="text-emerald-400 font-bold flex items-center gap-1">✓ Activo (Nube)</span>
+                                                ) : (
+                                                    <span className="text-blue-400 font-bold flex items-center gap-1">Local (Navegador)</span>
+                                                )}
+                                            </div>
+
+                                            {firebaseError && (
+                                                <div className="bg-rose-500/10 border border-rose-500/20 p-4 rounded-xl space-y-2 animate-fadeIn">
+                                                    <div className="text-rose-400 font-extrabold text-xs uppercase tracking-wider flex items-center gap-1.5">
+                                                        ⚠ Error de conexión
+                                                    </div>
+                                                    <p className="text-slate-300 leading-relaxed text-[11px]">
+                                                        {firebaseError}
+                                                    </p>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {firebaseStatus === 'connected' && (
+                                            <button 
+                                                onClick={uploadCurrentDataToFirebase} 
+                                                className="w-full bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black py-2.5 rounded-xl transition shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-1.5"
+                                            >
+                                                {SVGIcons.save} Sincronizar mis datos actuales en Firebase
+                                            </button>
+                                        )}
+                                    </div>
+                                    
+                                    <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 space-y-4 shadow-xl">
+                                        <h3 className="font-bold text-white text-sm">Carga vuestro Excel a Firebase (Respaldos .CSV)</h3>
+                                        <div className="flex items-center gap-3">
+                                            <input type="file" accept=".csv" onChange={handleCSVUpload} id="csvFileInput" className="hidden" />
+                                            <label htmlFor="csvFileInput" className="cursor-pointer bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition shadow-lg shadow-emerald-500/20">
+                                                Subir Archivo CSV de Cuentas
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                        </div>
                     </main>
+
+                    <footer className="bg-slate-900 border-t border-slate-800/80 py-5 text-center text-[10px] text-slate-500 mt-auto uppercase tracking-wider font-semibold">
+                        <p>© 2026 Panel de Control Financiero Familiar de Laura y Asier.</p>
+                    </footer>
                 </div>
             );
         }
 
-        // Renderizado clásico directo
-        const root = ReactDOM.createRoot(document.getElementById('root'));
+        function ResponsiveSVGChart({ rows, metaTotal }) {
+            if (!rows || rows.length === 0) return null;
+
+            const width = 600;
+            const height = 180;
+            const padding = 30;
+
+            const maxVal = Math.max(...rows.map(r => Math.max(r.acumulado, r.simulacionAcumulado, metaTotal))) * 1.1;
+            const minVal = 0;
+
+            const pointsReal = rows.map((r, i) => {
+                const x = padding + (i / (rows.length - 1)) * (width - padding * 2);
+                const y = height - padding - ((r.acumulado - minVal) / (maxVal - minVal)) * (height - padding * 2);
+                return { x, y, val: r.acumulado, name: r.name };
+            });
+
+            const pointsSim = rows.map((r, i) => {
+                const x = padding + (i / (rows.length - 1)) * (width - padding * 2);
+                const y = height - padding - ((r.simulacionAcumulado - minVal) / (maxVal - minVal)) * (height - padding * 2);
+                return { x, y, val: r.simulacionAcumulado };
+            });
+
+            const pathRealD = pointsReal.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
+            const pathSimD = pointsSim.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
+
+            const areaRealD = `${pathRealD} L ${pointsReal[pointsReal.length - 1].x} ${height - padding} L ${pointsReal[0].x} ${height - padding} Z`;
+
+            return (
+                <div className="relative w-full">
+                    <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-auto text-slate-700">
+                        <defs>
+                            <linearGradient id="realGradient" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0%" stopColor="#0ea5e9" />
+                                <stop offset="100%" stopColor="transparent" />
+                            </linearGradient>
+                        </defs>
+                        {[0, 0.25, 0.5, 0.75, 1].map((ratio, idx) => {
+                            const y = padding + ratio * (height - padding * 2);
+                            const valLabel = Math.round(maxVal - ratio * (maxVal - minVal));
+                            return (
+                                <g key={idx}>
+                                    <line x1={padding} y1={y} x2={width - padding} y2={y} stroke="rgba(51, 65, 85, 0.15)" strokeWidth="1" />
+                                    <text x={padding - 5} y={y + 3} fill="#475569" fontSize="8" fontWeight="bold" textAnchor="end">
+                                        {valLabel.toLocaleString('es-ES')}
+                                    </text>
+                                </g>
+                            );
+                        })}
+
+                        <path d={areaRealD} fill="url(#realGradient)" opacity="0.12" />
+                        <path d={pathSimD} fill="none" stroke="#6366f1" strokeWidth="2" strokeDasharray="3,3" />
+                        <path d={pathRealD} fill="none" stroke="#0ea5e9" strokeWidth="3" strokeLinecap="round" />
+
+                        {pointsReal.map((p, i) => (
+                            <g key={i} className="group cursor-pointer">
+                                <circle cx={p.x} cy={p.y} r="3.5" fill="#0ea5e9" stroke="#0f172a" strokeWidth="1.5" />
+                                <circle cx={p.x} cy={p.y} r="8" fill="transparent" />
+                                <title>{`${p.name}: ${Math.round(p.val).toLocaleString('es-ES')} €`}</title>
+                            </g>
+                        ))}
+
+                        {pointsReal.filter((_, idx) => idx % 2 === 0).map((p, idx) => (
+                            <text key={idx} x={p.x} y={height - 8} fill="#64748b" fontSize="8" fontWeight="bold" textAnchor="middle">
+                                {p.name.split(' ')[0]}
+                            </text>
+                        ))}
+                    </svg>
+                </div>
+            );
+        }
+
+        function ProjectTimeline({ contributions, processedData, targetSaving, metaTotal, houseMetas, saldoInicial }) {
+            const totalMuebles = processedData.totalMueblesPresupuesto - processedData.totalMueblesGastado;
+
+            const lastMonthIndex = contributions.length;
+            const lastMonthAccumulated = processedData.totalAhorrado;
+
+            const calculateMonthProjection = (targetAmount) => {
+                if (targetAmount <= lastMonthAccumulated) {
+                    let sum = saldoInicial;
+                    for (let i = 0; i < contributions.length; i++) {
+                        sum += Number(contributions[i].laura) + Number(contributions[i].asier);
+                        if (sum >= targetAmount) {
+                            return i + 1; 
+                        }
+                    }
+                    return 1;
+                } else {
+                    const remaining = targetAmount - lastMonthAccumulated;
+                    const additional = Math.ceil(remaining / targetSaving);
+                    return lastMonthIndex + additional;
+                }
+            };
+
+            const indexEntrada = calculateMonthProjection(34870);
+            const indexIVA = calculateMonthProjection(34870 + 27896);
+            const indexPersonalizacion = calculateMonthProjection(metaTotal);
+            const indexMuebles = calculateMonthProjection(metaTotal + totalMuebles);
+
+            const getMonthLabel = (idx) => {
+                const date = new Date(2026, 2, 1); 
+                date.setMonth(date.getMonth() + (idx - 1));
+                return date.toLocaleDateString('es-ES', { month: 'short', year: '2-digit' }).toUpperCase();
+            };
+
+            const getMonthFullLabel = (idx) => {
+                const date = new Date(2026, 2, 1);
+                date.setMonth(date.getMonth() + (idx - 1));
+                return date.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
+            };
+
+            const mapIndexToPercentage = (idx) => {
+                return Math.max(0, Math.min(100, ((idx - 1) / 30) * 100));
+            };
+
+            const todayPercentage = 11.0; 
+
+            const timelineMilestones = [
+                {
+                    id: 'entrada',
+                    label: '10% Segunda Entrada',
+                    amount: '34.870 €',
+                    index: indexEntrada,
+                    color: 'text-cyan-400',
+                    bgColor: 'bg-cyan-500',
+                    borderColor: 'border-cyan-500',
+                    isPast: indexEntrada <= 4, 
+                    deadlineOk: indexEntrada <= 31
+                },
+                {
+                    id: 'iva',
+                    label: 'IVA & Gastos de Escritura',
+                    amount: '27.896 €',
+                    index: indexIVA,
+                    color: 'text-purple-400',
+                    bgColor: 'bg-purple-500',
+                    borderColor: 'border-purple-500',
+                    isPast: indexIVA <= 4,
+                    deadlineOk: indexIVA <= 31
+                },
+                {
+                    id: 'pers',
+                    label: 'Personalización',
+                    amount: '3.863 €',
+                    index: indexPersonalizacion,
+                    color: 'text-brand-400',
+                    bgColor: 'bg-brand-500',
+                    borderColor: 'border-brand-500',
+                    isPast: indexPersonalizacion <= 4,
+                    deadlineOk: indexPersonalizacion <= 31
+                },
+                {
+                    id: 'muebles',
+                    label: 'Muebles Completos',
+                    amount: `${totalMuebles.toLocaleString('es-ES')} €`,
+                    index: indexMuebles,
+                    color: 'text-pink-400',
+                    bgColor: 'bg-pink-500',
+                    borderColor: 'border-pink-500',
+                    isPast: indexMuebles <= 4,
+                    deadlineOk: indexMuebles <= 31
+                }
+            ];
+
+            return (
+                <div className="space-y-8 py-6 px-4">
+                    <div className="relative w-full h-12 flex items-center">
+                        <div className="absolute w-full h-1.5 bg-slate-800 rounded-full"></div>
+                        <div className="absolute h-1.5 bg-gradient-to-r from-cyan-600 to-indigo-500 rounded-full" style={{ width: `${todayPercentage}%` }}></div>
+
+                        <div className="absolute -translate-x-1/2 -top-1 z-30 flex flex-col items-center" style={{ left: `${todayPercentage}%` }}>
+                            <div className="bg-indigo-600 text-white font-extrabold text-[9px] px-2 py-0.5 rounded-md mb-1 shadow-lg shadow-indigo-500/20 whitespace-nowrap animate-bounce uppercase">
+                                ¡Estáis aquí!
+                            </div>
+                            <div className="relative">
+                                <span className="absolute -inset-1 rounded-full bg-cyan-500/30 glowing-ring"></span>
+                                <svg className="w-6 h-6 text-yellow-400 drop-shadow" viewBox="0 0 24 24" fill="currentColor">
+                                    <circle cx="12" cy="8" r="4" fill="#fbbf24" />
+                                    <path d="M12 2a4 4 0 0 1 4 4h-8a4 4 0 0 1 4-4z" fill="#f59e0b" />
+                                    <path d="M12 14c-4.418 0-8 2.239-8 5v3h16v-3c0-2.761-3.582-5-8-5z" fill="#38bdf8" />
+                                </svg>
+                            </div>
+                        </div>
+
+                        {milestones => timelineMilestones.map((milestone) => {
+                            const pct = mapIndexToPercentage(milestone.index);
+                            const onTime = milestone.deadlineOk;
+                            return (
+                                <div key={milestone.id} className="absolute -translate-x-1/2 flex flex-col items-center z-10" style={{ left: `${pct}%` }}>
+                                    <div className={`w-4 h-4 rounded-full border-2 bg-slate-950 flex items-center justify-center transition-all ${
+                                        milestone.isPast ? 'border-emerald-500 bg-emerald-500/10' :
+                                        onTime ? 'border-cyan-500 bg-cyan-500/10' : 'border-rose-500 bg-rose-500/10'
+                                    }`}>
+                                        <span className={`w-1.5 h-1.5 rounded-full ${milestone.isPast ? 'bg-emerald-400' : onTime ? 'bg-cyan-400' : 'bg-rose-500 animate-ping'}`}></span>
+                                    </div>
+                                    <span className="text-[9px] font-black text-slate-400 mt-2 bg-slate-900 px-1 py-0.5 rounded border border-slate-800">
+                                        {getMonthLabel(milestone.index)}
+                                    </span>
+                                </div>
+                            );
+                        })}
+
+                        <div className="absolute right-0 -translate-x-1/2 flex flex-col items-center z-20">
+                            <div className="w-5 h-5 rounded-lg bg-indigo-600 flex items-center justify-center text-white border border-indigo-500 shadow-md">
+                                🗝️
+                            </div>
+                            <span className="text-[9px] font-black text-indigo-400 mt-2 bg-indigo-950/60 px-1 py-0.5 rounded border border-indigo-800/40">
+                                SEP 28
+                            </span>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-8 pt-4">
+                        {timelineMilestones.map((m) => {
+                            const onTime = m.deadlineOk;
+                            const isFinished = m.isPast;
+                            return (
+                                <div key={m.id} className={`p-4 rounded-2xl border transition ${
+                                    isFinished ? 'bg-emerald-950/10 border-emerald-500/20' :
+                                    onTime ? 'bg-slate-900/60 border-slate-800/80' : 'bg-rose-950/10 border-rose-500/20'
+                                }`}>
+                                    <div className="flex items-start justify-between">
+                                        <div className="space-y-1">
+                                            <h4 className="text-xs font-black text-white uppercase tracking-wider">{m.label}</h4>
+                                            <p className="text-[10px] text-slate-400">Objetivo acumulado: <strong className="text-white">{m.amount}</strong></p>
+                                        </div>
+                                        <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${
+                                            isFinished ? 'bg-emerald-500/10 text-emerald-400' :
+                                            onTime ? 'bg-cyan-500/10 text-cyan-400' : 'bg-rose-500/10 text-rose-400'
+                                        }`}>
+                                            {isFinished ? '¡YA ALCANZADO!' : onTime ? 'A tiempo' : 'En riesgo'}
+                                        </span>
+                                    </div>
+                                    
+                                    <div className="mt-4 flex items-center justify-between text-xs">
+                                        <span className="text-slate-400">Fecha proyectada:</span>
+                                        <strong className="text-white font-extrabold">{getMonthFullLabel(m.index)}</strong>
+                                    </div>
+                                    
+                                    <div className="mt-2 text-[10px] text-slate-500 leading-relaxed">
+                                        {isFinished ? (
+                                            `Ya acumulasteis la cantidad correspondiente de este hito con las aportaciones registradas.`
+                                        ) : onTime ? (
+                                            `Llegaréis con holgura de ${31 - m.index} meses antes del límite de firma.`
+                                        ) : (
+                                            `Al ritmo de ahorro fijado (€${targetSaving}/mes), este hito se retrasará hasta después del límite.`
+                                        )}
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            );
+        }
+
+        // Renderizado clásico directo y seguro sin llamadas implícitas
+        const container = document.getElementById('root');
+        const root = ReactDOM.createRoot(container);
         root.render(React.createElement(App));
     </script>
 </body>
