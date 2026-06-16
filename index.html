@@ -4,7 +4,20 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Casa Control - Gestión de Gastos, Entrada e Hipoteca</title>
-    <!-- Tailwind CSS Play CDN -->
+    
+    <!-- Bloqueador de Avisos (Warnings) en Consola -->
+    <script>
+        const originalWarn = console.warn;
+        console.warn = function(...args) {
+            if (typeof args[0] === 'string') {
+                if (args[0].includes('cdn.tailwindcss.com should not be used in production')) return;
+                if (args[0].includes('You are using the in-browser Babel transformer')) return;
+            }
+            originalWarn.apply(console, args);
+        };
+    </script>
+
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -12,54 +25,25 @@
             theme: {
                 extend: {
                     colors: {
-                        brand: {
-                            50: '#f0f9ff',
-                            100: '#e0f2fe',
-                            500: '#0ea5e9',
-                            600: '#0284c7',
-                            700: '#0369a1',
-                            900: '#0c4a6e',
-                        }
+                        brand: { 50: '#f0f9ff', 100: '#e0f2fe', 500: '#0ea5e9', 600: '#0284c7', 700: '#0369a1', 900: '#0c4a6e' }
                     }
                 }
             }
         }
     </script>
-    <!-- Google Fonts Inter -->
+
+    <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     <style>
-        body {
-            font-family: 'Inter', sans-serif;
-        }
-        /* Custom scrollbar */
-        ::-webkit-scrollbar {
-            width: 6px;
-            height: 6px;
-        }
-        ::-webkit-scrollbar-track {
-            background: #0f172a;
-        }
-        ::-webkit-scrollbar-thumb {
-            background: #334155;
-            border-radius: 4px;
-        }
-        ::-webkit-scrollbar-thumb:hover {
-            background: #0ea5e9;
-        }
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(8px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        .animate-fadeIn {
-            animation: fadeIn 0.4s ease-out forwards;
-        }
-        @keyframes pulseGlow {
-            0%, 100% { transform: scale(1); opacity: 0.4; }
-            50% { transform: scale(1.15); opacity: 0.8; }
-        }
-        .glowing-ring {
-            animation: pulseGlow 2s infinite ease-in-out;
-        }
+        body { font-family: 'Inter', sans-serif; }
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #0f172a; }
+        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #0ea5e9; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+        .animate-fadeIn { animation: fadeIn 0.4s ease-out forwards; }
+        @keyframes pulseGlow { 0%, 100% { transform: scale(1); opacity: 0.4; } 50% { transform: scale(1.15); opacity: 0.8; } }
+        .glowing-ring { animation: pulseGlow 2s infinite ease-in-out; }
     </style>
     
     <!-- React & Babel CDNs -->
@@ -67,15 +51,13 @@
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-    <!-- Firebase Compat SDKs (Elimina los imports ES6 evitando el error de appendChild) -->
+    <!-- Firebase Compat SDKs (Librerías globales seguras sin módulos) -->
     <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore-compat.js"></script>
 
-    <!-- MathJax for Elegant LaTeX rendering -->
-    <script type="text/javascript" id="MathJax-script" async
-      src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js">
-    </script>
+    <!-- MathJax -->
+    <script type="text/javascript" id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
 </head>
 <body class="h-full antialiased text-slate-200 bg-slate-950">
 
@@ -113,10 +95,9 @@
             { id: "m17", name: "Julio (Año 2)", laura: 800, asier: 1500, revolut: 18801, simulacion: 1685 },
             { id: "m18", name: "Agosto (Año 2)", laura: 800, asier: 2000, revolut: 19940, simulacion: 1527 },
             { id: "m19", name: "Septiembre (Año 2)", laura: 800, asier: 1500, revolut: 20580, simulacion: 1450 },
-            { id: "m20", name: "Octubre (Año 2)", laura: 800, asier: 1500, revolut: 10531.27, simulacion: 1373 } // Saldo real de Revolut corregido por el usuario
+            { id: "m20", name: "Octubre (Año 2)", laura: 800, asier: 1500, revolut: 10531.27, simulacion: 1373 }
         ];
 
-        // --- LISTADO DE PRESUPUESTO DE MUEBLES ---
         const DEFAULT_FURNITURE_BUDGET = [
             { id: 'f1', category: 'Cocina & Electrodomésticos', item: 'Frigorífico, horno, inducción y lavavajillas (PAGADO COMPLETO)', amount: 4500, spent: 4500, status: 'Comprado', priority: 'Alta' },
             { id: 'f2', category: 'Salón / Sala', item: 'Sofá chaise longue cómodo, mueble de TV y mesa de comedor', amount: 3300, spent: 0, status: 'Pendiente', priority: 'Alta' },
@@ -128,7 +109,6 @@
             { id: 'f8', category: 'Mudanza & Detalles', item: 'Cajas de embalar, transporte profesional e imprevistos', amount: 800, spent: 0, status: 'Pendiente', priority: 'Media' }
         ];
 
-        // --- CREDENCIALES DEL PROYECTO DEL USUARIO ---
         const DEFAULT_FIREBASE_CREDENTIALS = {
             apiKey: "AIzaSyCLPhH1UmIrrv4K9CBnDzW47Kigt91FU8g",
             authDomain: "housecontrol-2bace.firebaseapp.com",
@@ -138,7 +118,6 @@
             appId: "1:655569001492:web:968b5c5fe7f418927e5b01"
         };
 
-        // --- ICONOS VECTORIALES SVG PARA EVITAR DEPENDENCIAS EXTERNAS ---
         const SVGIcons = {
             home: <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor" class="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25" /></svg>,
             wallet: <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="2" stroke="currentColor" class="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M21 12a2.25 2.25 0 00-2.25-2.25H15a3 3 0 11-6 0H5.25A2.25 2.25 0 003 12m18 0v6a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 18v-6m18 0V9M3 12V9m18-3a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 003 6v3h18V6z" /></svg>,
@@ -205,7 +184,7 @@
             const [firebaseConfigForm, setFirebaseConfigForm] = useState(DEFAULT_FIREBASE_CREDENTIALS);
             const [firebaseError, setFirebaseError] = useState(null);
 
-            // Estados temporales locales para evitar bloqueos de input al escribir (Typing block resolved)
+            // Estados temporales locales para evitar bloqueos
             const [tempCorrection, setTempCorrection] = useState("0.00");
             const [tempCorrectionReason, setTempCorrectionReason] = useState("Ajuste inicial de saldo real de Revolut");
             const [tempRepaidAmount, setTempRepaidAmount] = useState("0");
@@ -213,7 +192,6 @@
             // Estado para nuevas partidas de muebles
             const [newFurniture, setNewFurniture] = useState({ category: "", item: "", amount: 0, priority: "Media" });
 
-            // Sincronizar estados locales cuando cambia la base de datos de fondo
             useEffect(() => {
                 setTempCorrection(revolutCorrection.toString());
                 setTempCorrectionReason(revolutCorrectionReason);
@@ -233,7 +211,7 @@
             const dbRef = useRef(null);
             const syncUnsubscribe = useRef(null);
 
-            // Reloj para actualización pasiva de intereses en tiempo real
+            // Reloj para actualización pasiva de intereses
             useEffect(() => {
                 const interval = setInterval(() => {
                     setLiveSeconds(prev => prev + 1);
@@ -241,7 +219,6 @@
                 return () => clearInterval(interval);
             }, []);
 
-            // Cargar datos locales o conectar a Firebase automáticamente al inicio
             useEffect(() => {
                 if (firebaseConfig) {
                     setFirebaseConfigForm(firebaseConfig);
@@ -269,7 +246,6 @@
                 const localEmails = localStorage.getItem('casa_local_allowed_emails');
                 const localPin = localStorage.getItem('casa_local_family_pin');
 
-                // Nuevos locales
                 const localLauraInit = localStorage.getItem('casa_local_laura_initial');
                 const localAsierInit = localStorage.getItem('casa_local_asier_initial');
                 const localRepaid = localStorage.getItem('casa_local_repaid_laura');
@@ -302,7 +278,13 @@
                 }
             };
 
-            // Conexión a Firebase utilizando el SDK compatible para evitar fallos de compilación dinámicos
+            // Disparar renderizado de LaTeX
+            useEffect(() => {
+                if (window.MathJax && window.MathJax.typesetPromise) {
+                    window.MathJax.typesetPromise().catch((err) => console.log(err));
+                }
+            }, [currentTab, interestRate, loanTermYears, targetMonthlySaving]);
+
             const connectFirebase = async (config) => {
                 setFirebaseStatus('connecting');
                 setFirebaseError(null);
@@ -322,7 +304,6 @@
                     const db = firebase.firestore();
                     dbRef.current = db;
 
-                    // Escuchar estado de autenticación de Firebase
                     auth.onAuthStateChanged((firebaseUser) => {
                         if (firebaseUser) {
                             if (firebaseUser.email) {
@@ -381,7 +362,7 @@
                             }
                         }
                     }, (error) => {
-                        console.warn("Fallo al leer config de Firestore, usando locales", error);
+                        console.warn("Fallo al leer config de Firestore, usando locales");
                     });
 
                     const contribCollection = db.collection('artifacts').doc(appIdSlug).collection('public').doc('data').collection('contributions');
@@ -485,7 +466,6 @@
                 }
             };
 
-            // Guardar cambios aplicados manualmente al balance o intereses sin bloqueos
             const saveBalanceAdjustment = () => {
                 const correctionNum = parseFloat(tempCorrection) || 0;
                 setRevolutCorrection(correctionNum);
@@ -494,7 +474,6 @@
                 addNotification("Ajuste de balance guardado con éxito");
             };
 
-            // Guardar reembolso de Asier a Laura
             const saveRepaidAmount = () => {
                 const repaidNum = parseFloat(tempRepaidAmount) || 0;
                 setRepaidToLaura(repaidNum);
@@ -502,7 +481,6 @@
                 addNotification("Historial de devolución actualizado");
             };
 
-            // Login por Google
             const loginWithGoogle = () => {
                 setLoginError("");
                 if (typeof firebase === 'undefined') {
@@ -527,11 +505,10 @@
                     })
                     .catch((err) => {
                         console.error(err);
-                        setLoginError(`Fallo al iniciar sesión: ${err.message}. Recuerda activar el inicio de sesión por Google en tu consola Firebase.`);
+                        setLoginError(`Fallo al iniciar sesión: ${err.message}. Recuerda activar Google Auth en Firebase.`);
                     });
             };
 
-            // Login tradicional con Email y Contraseña (Registro automático si no existe)
             const handleEmailPasswordAuth = (e) => {
                 e.preventDefault();
                 setLoginError("");
@@ -565,7 +542,7 @@
                         })
                         .catch((err) => {
                             if (err.code === 'auth/user-not-found') {
-                                setLoginError("Este correo no está registrado. Marca la casilla de abajo para registrarte.");
+                                setLoginError("Este correo no está registrado. Marca la casilla para registrarte.");
                             } else {
                                 setLoginError(err.message);
                             }
@@ -573,7 +550,6 @@
                 }
             };
 
-            // Login por PIN
             const handlePinLogin = (e) => {
                 e.preventDefault();
                 setLoginError("");
@@ -614,7 +590,6 @@
                 }
             };
 
-            // --- CÁLCULOS DINÁMICOS DE APORTACIONES E INTERESES CON RETENCIÓN ---
             const processedData = useMemo(() => {
                 let currentAccumulated = saldoInicial;
                 let totalLaura = 0;
@@ -648,10 +623,8 @@
                 const totalAhorrado = currentAccumulated;
                 const porcentajeProgreso = Math.min(100, (totalAhorrado / metaTotal) * 100);
                 
-                // Saldo base de la última conciliación
                 const lastMonthRevolutBase = contributions.length > 0 ? Number(contributions[contributions.length - 1].revolut) : saldoInicial;
 
-                // --- NUEVO SISTEMA DE INTERÉS CON RETENCIÓN FISCAL DEL IRPF ---
                 const balanceAntesDeIntereses = lastMonthRevolutBase + revolutCorrection;
 
                 const lastDate = new Date(reconciliationDate || "2026-06-01");
@@ -659,34 +632,24 @@
                 const diffTime = Math.max(0, today - lastDate);
                 const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
                 
-                // Fórmula compuesta diaria basada en TIN anual: r_diario = (TIN / 100) / 365
                 const r_diario = (annualInterestRate / 100) / 365;
                 const accumulatedInterestGross = balanceAntesDeIntereses * (Math.pow(1 + r_diario, diffDays) - 1);
                 
-                // Aplicar el impuesto de retención (ej: 19% en España)
                 const taxFactor = taxRatePercentage / 100;
                 const accumulatedInterestRealTime = accumulatedInterestGross * (1 - taxFactor);
 
-                // Cuánto genera por día en este momento exacto (Neto e impuesto)
                 const interestPerDayGross = (balanceAntesDeIntereses + accumulatedInterestGross) * r_diario;
                 const interestPerDay = interestPerDayGross * (1 - taxFactor);
                 const taxWithheldPerDay = interestPerDayGross * taxFactor;
 
-                // Saldo Revolut final aplicando el interés neto compuesto acumulado en tiempo real y corrector manual
                 const saldoRevolutActual = balanceAntesDeIntereses + accumulatedInterestRealTime;
 
-                // Muebles
                 const totalMueblesPresupuesto = furnitureBudget.reduce((sum, item) => sum + item.amount, 0);
                 const totalMueblesGastado = furnitureBudget.reduce((sum, item) => sum + item.spent, 0);
 
-                // --- CÁLCULO DE BALANCE DE COMPENSACIÓN GLOBAL ---
                 const deudaInicialAsierALaura = (lauraInitialPayment - asierInitialPayment) / 2;
                 const deudaInicialPendiente = Math.max(0, deudaInicialAsierALaura - repaidToLaura);
-
-                // Diferencia en ingresos mensuales de Revolut
                 const deudaMensualAsierALaura = (totalLaura - totalAsier) / 2;
-
-                // Balance de Compensación consolidado final (Initial Debt + Monthly Transfer Debt)
                 const balanceConsolidadoAsierALaura = deudaInicialPendiente + deudaMensualAsierALaura;
 
                 return {
@@ -712,7 +675,6 @@
                 };
             }, [contributions, metaTotal, saldoInicial, furnitureBudget, reconciliationDate, annualInterestRate, taxRatePercentage, revolutCorrection, liveSeconds, lauraInitialPayment, asierInitialPayment, repaidToLaura]);
 
-            // --- PROYECCIONES DE TIEMPO Y CONSEJOS ---
             const projections = useMemo(() => {
                 const restanteCasa = Math.max(0, metaTotal - processedData.totalAhorrado);
                 const restanteMuebles = Math.max(0, processedData.totalMueblesPresupuesto - processedData.totalMueblesGastado);
@@ -748,7 +710,6 @@
                 };
             }, [processedData, targetMonthlySaving, metaTotal, contributions]);
 
-            // --- SIMULADOR HIPOTECA ---
             const hipotecaData = useMemo(() => {
                 const valorVivienda = 348700;
                 const prestamoHipotecario = valorVivienda * 0.8; 
@@ -774,10 +735,6 @@
                     totalIntereses
                 };
             }, [interestRate, loanTermYears]);
-
-            // --- GESTIÓN DE EDICIONES DE MESES ---
-            const [editingMonth, setEditingMonth] = useState(null);
-            const [editForm, setEditForm] = useState({ name: "", laura: 0, asier: 0, revolut: 0, simulacion: 0 });
 
             const startEdit = (month) => {
                 setEditingMonth(month.id);
@@ -836,7 +793,6 @@
                 }
             };
 
-            // --- GESTIÓN DE PARTIDAS DE MUEBLES ---
             const addFurnitureItem = () => {
                 if (!newFurniture.category || !newFurniture.item || !newFurniture.amount) {
                     addNotification("Completa todos los campos para añadir el mueble", "error");
@@ -882,7 +838,21 @@
                 addNotification("Estado de compra actualizado");
             };
 
-            // --- CSV IMPORT UTILITIES ---
+            const updateFirebaseConfigInApp = (e) => {
+                e.preventDefault();
+                localStorage.setItem('casa_firebase_config', JSON.stringify(firebaseConfigForm));
+                setFirebaseConfig(firebaseConfigForm);
+                connectFirebase(firebaseConfigForm);
+            };
+
+            const resetToDefaultCredentials = () => {
+                localStorage.removeItem('casa_firebase_config');
+                setFirebaseConfigForm(DEFAULT_FIREBASE_CREDENTIALS);
+                setFirebaseConfig(DEFAULT_FIREBASE_CREDENTIALS);
+                connectFirebase(DEFAULT_FIREBASE_CREDENTIALS);
+                addNotification("Restaurado a credenciales por defecto", "info");
+            };
+
             const handleCSVUpload = (e) => {
                 const file = e.target.files[0];
                 if (!file) return;
@@ -945,14 +915,13 @@
                         setHouseMetas(parsedMetas);
                         setContributions(parsedMonthly);
                         persistData(parsedMonthly, parsedMeta, parsedSaldo, parsedMetas);
-                        addNotification("Importación de CSV completada", "success");
+                        addNotification("Carga de CSV completada", "success");
                     }
                 } catch (err) {
                     addNotification("Error procesando CSV", "error");
                 }
             };
 
-            // --- VISTA DE LOGIN Y REGISTRO AUTORIZADO DE PAREJA ---
             if (!isAuthenticated) {
                 return (
                     <div class="min-h-screen flex items-center justify-center bg-slate-950 px-4 md:p-6">
@@ -971,7 +940,6 @@
                                 </div>
                             )}
 
-                            {/* Opción 1: Acceso rápido por PIN */}
                             <form onSubmit={handlePinLogin} class="space-y-3">
                                 <label class="block text-left text-[10px] font-black text-slate-400 uppercase tracking-wider">Acceso rápido familiar por PIN</label>
                                 <input 
@@ -993,7 +961,6 @@
                                 <div class="flex-grow border-t border-slate-800/60"></div>
                             </div>
 
-                            {/* Opción 2: Formulario tradicional Email & Contraseña de Pareja */}
                             <form onSubmit={handleEmailPasswordAuth} class="space-y-3.5 text-left">
                                 <div>
                                     <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Correo Electrónico Autorizado</label>
@@ -1039,7 +1006,6 @@
                                 <div class="flex-grow border-t border-slate-800/60"></div>
                             </div>
 
-                            {/* Opción 3: Acceso por Google */}
                             <button 
                                 onClick={loginWithGoogle}
                                 class="w-full bg-slate-950 hover:bg-slate-850 text-white border border-slate-800 text-xs font-bold py-3.5 px-4 rounded-xl transition flex items-center justify-center gap-2.5 shadow-md"
@@ -1058,7 +1024,6 @@
 
             return (
                 <div class="flex-1 flex flex-col min-h-screen animate-fadeIn">
-                    {/* ENCABEZADO PRÉMIUM */}
                     <header class="bg-slate-900 border-b border-slate-800 py-4 px-6 sticky top-0 z-40 shadow-xl">
                         <div class="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
                             <div class="flex items-center gap-4">
@@ -1073,7 +1038,6 @@
                                 </div>
                             </div>
 
-                            {/* ESTADOS DE SINCRONIZACIÓN Y USUARIO */}
                             <div class="flex flex-wrap items-center gap-3">
                                 {firebaseStatus === 'connected' ? (
                                     <span class="flex items-center gap-1.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 px-3 py-1.5 rounded-xl text-xs font-bold animate-fadeIn">
@@ -1094,7 +1058,6 @@
                         </div>
                     </header>
 
-                    {/* PIE DE NOTIFICACIONES */}
                     <div class="fixed bottom-6 right-6 z-50 flex flex-col gap-2 max-w-sm">
                         {notifications.map(n => (
                             <div key={n.id} class={`flex items-center gap-2.5 p-3.5 rounded-2xl shadow-2xl border text-sm font-semibold animate-fadeIn ${
@@ -1108,7 +1071,6 @@
                         ))}
                     </div>
 
-                    {/* PROGRESO INTEGRADO GLOBAL */}
                     <div class="bg-slate-900/50 px-6 py-3 border-b border-slate-800">
                         <div class="max-w-7xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
                             <div class="w-full md:w-2/3 space-y-1">
@@ -1127,45 +1089,33 @@
                         </div>
                     </div>
 
-                    {/* NAVEGADOR DE CONTENIDO */}
                     <main class="flex-1 max-w-7xl w-full mx-auto p-4 md:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
-                        
-                        {/* Selector de Pestañas (Lateral Izquierdo) */}
                         <div class="lg:col-span-3 flex flex-row lg:flex-col gap-1.5 overflow-x-auto pb-3 lg:pb-0 border-b lg:border-b-0 lg:border-r border-slate-800/60 lg:pr-4">
                             <button onClick={() => setCurrentTab('dashboard')} class={`flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-bold uppercase tracking-wider transition shrink-0 ${currentTab === 'dashboard' ? 'bg-cyan-500/10 border border-cyan-500/20 text-cyan-400' : 'hover:bg-slate-900 text-slate-400'}`}>
-                                {SVGIcons.wallet}
-                                Cuenta Conjunta Revolut
+                                {SVGIcons.wallet} Cuenta Conjunta Revolut
                             </button>
                             <button onClick={() => setCurrentTab('simulation')} class={`flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-bold uppercase tracking-wider transition shrink-0 ${currentTab === 'simulation' ? 'bg-cyan-500/10 border border-cyan-500/20 text-cyan-400' : 'hover:bg-slate-900 text-slate-400'}`}>
-                                {SVGIcons.scale}
-                                Registro de Historial
+                                {SVGIcons.scale} Registro de Historial
                             </button>
                             <button onClick={() => setCurrentTab('projections')} class={`flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-bold uppercase tracking-wider transition shrink-0 ${currentTab === 'projections' ? 'bg-amber-500/10 border border-amber-500/20 text-amber-400' : 'hover:bg-slate-900 text-slate-400'}`}>
-                                {SVGIcons.hourglass}
-                                Proyección de Futuro
+                                {SVGIcons.hourglass} Proyección de Futuro
                             </button>
                             <button onClick={() => setCurrentTab('furniture')} class={`flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-bold uppercase tracking-wider transition shrink-0 ${currentTab === 'furniture' ? 'bg-pink-500/10 border border-pink-500/20 text-pink-400' : 'hover:bg-slate-900 text-slate-400'}`}>
-                                {SVGIcons.home}
-                                Presupuesto Muebles
+                                {SVGIcons.home} Presupuesto Muebles
                             </button>
                             <button onClick={() => setCurrentTab('mortgage')} class={`flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-bold uppercase tracking-wider transition shrink-0 ${currentTab === 'mortgage' ? 'bg-purple-500/10 border border-purple-500/20 text-purple-400' : 'hover:bg-slate-900 text-slate-400'}`}>
-                                {SVGIcons.save}
-                                Planificación Hipoteca
+                                {SVGIcons.save} Planificación Hipoteca
                             </button>
                             <button onClick={() => setCurrentTab('config')} class={`flex items-center gap-3 px-4 py-3 rounded-2xl text-xs font-bold uppercase tracking-wider transition shrink-0 ${currentTab === 'config' ? 'bg-slate-800 border border-slate-700 text-slate-200' : 'hover:bg-slate-900 text-slate-500'}`}>
-                                {SVGIcons.settings}
-                                Ajustes Nube & Auth
+                                {SVGIcons.settings} Ajustes Nube & Auth
                             </button>
                         </div>
 
-                        {/* Contenido Dinámico (Derecha) */}
                         <div class="lg:col-span-9 space-y-6">
                             
-                            {/* PESTAÑA: MI CUENTA REVOLUT (DASHBOARD) */}
                             {currentTab === 'dashboard' && (
                                 <div class="space-y-6 animate-fadeIn">
                                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                        {/* Card 1: Líquido en Revolut */}
                                         <div class="bg-gradient-to-br from-slate-900 to-slate-950 p-6 rounded-3xl border border-slate-800 shadow-xl relative overflow-hidden group">
                                             <div class="absolute right-0 bottom-0 translate-x-4 translate-y-4 w-28 h-28 bg-cyan-500/5 rounded-full group-hover:scale-125 transition duration-500"></div>
                                             <div class="flex items-center justify-between mb-3">
@@ -1179,7 +1129,6 @@
                                             </p>
                                         </div>
 
-                                        {/* Card 2: Pendiente para firma */}
                                         <div class="bg-gradient-to-br from-slate-900 to-slate-950 p-6 rounded-3xl border border-slate-800 shadow-xl relative overflow-hidden group">
                                             <div class="absolute right-0 bottom-0 translate-x-4 translate-y-4 w-28 h-28 bg-amber-500/5 rounded-full group-hover:scale-125 transition duration-500"></div>
                                             <div class="flex items-center justify-between mb-3">
@@ -1190,7 +1139,6 @@
                                             <p class="text-[11px] text-slate-400 mt-2">Para cubrir gastos, entrada e IVA</p>
                                         </div>
 
-                                        {/* Card 3: Fondo de Muebles actual */}
                                         <div class="bg-gradient-to-br from-slate-900 to-slate-950 p-6 rounded-3xl border border-slate-800 shadow-xl relative overflow-hidden group">
                                             <div class="absolute right-0 bottom-0 translate-x-4 translate-y-4 w-28 h-28 bg-pink-500/5 rounded-full group-hover:scale-125 transition duration-500"></div>
                                             <div class="flex items-center justify-between mb-3">
@@ -1202,15 +1150,13 @@
                                         </div>
                                     </div>
 
-                                    {/* SECCIÓN INTERESES Y AJUSTE DE BALANCE CON IMPUESTOS DETALLADOS */}
                                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        {/* Panel goteo intereses con retención del 19% del IRPF */}
                                         <div class="bg-slate-900/60 p-5 rounded-3xl border border-slate-800 space-y-3 relative overflow-hidden group">
                                             <div class="absolute right-0 bottom-0 translate-x-4 translate-y-4 w-24 h-24 bg-emerald-500/5 rounded-full"></div>
                                             <div class="flex justify-between items-start">
                                                 <span class="text-[10px] uppercase font-black tracking-widest text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-md">Intereses Netos ({annualInterestRate}% TIN)</span>
                                                 <span class="text-[10px] text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded-md animate-pulse">
-                                                    +{processedData.interestPerDay.toLocaleString('es-ES', { minimumFractionDigits: 4, maximumFractionDigits: 4 })} €/día (Neto)
+                                                    +{processedData.interestPerDay.toLocaleString('es-ES', { minimumFractionDigits: 4, maximumFractionDigits: 4 })} €/día
                                                 </span>
                                             </div>
                                             <div class="text-2xl font-black text-white">{processedData.accumulatedInterestRealTime.toLocaleString('es-ES', { minimumFractionDigits: 5, maximumFractionDigits: 5 })} €</div>
@@ -1221,7 +1167,7 @@
                                                     <span class="font-semibold text-slate-300">+{processedData.accumulatedInterestGross.toLocaleString('es-ES', { minimumFractionDigits: 4 })} €</span>
                                                 </div>
                                                 <div class="flex justify-between text-rose-400/80">
-                                                    <span>Retención fiscal retenida ({taxRatePercentage}% IRPF):</span>
+                                                    <span>Retención IRPF ({taxRatePercentage}%):</span>
                                                     <span>-{(processedData.accumulatedInterestGross * (taxRatePercentage/100)).toLocaleString('es-ES', { minimumFractionDigits: 4 })} €</span>
                                                 </div>
                                                 <div class="flex justify-between text-emerald-400 border-t border-slate-800/80 pt-1 mt-1 font-bold">
@@ -1231,7 +1177,6 @@
                                             </div>
                                         </div>
 
-                                        {/* Editor rápido de corrector para evitar bloqueos */}
                                         <div class="bg-slate-900/60 p-5 rounded-3xl border border-slate-800 space-y-3 relative overflow-hidden group">
                                             <div class="absolute right-0 bottom-0 translate-x-4 translate-y-4 w-24 h-24 bg-cyan-500/5 rounded-full"></div>
                                             <div class="flex justify-between items-start">
@@ -1263,7 +1208,6 @@
                                         </div>
                                     </div>
 
-                                    {/* SECCIÓN DE GRÁFICO VECTORIAL INTERACTIVO COMPATIBLE */}
                                     <div class="bg-slate-900/40 p-6 rounded-3xl border border-slate-800 shadow-xl space-y-4">
                                         <div class="flex justify-between items-center">
                                             <div>
@@ -1280,13 +1224,11 @@
                                             </div>
                                         </div>
 
-                                        {/* Gráfico SVG Programado Nativo en React */}
                                         <div class="w-full bg-slate-950/60 p-4 rounded-2xl border border-slate-800/80">
                                             <ResponsiveSVGChart rows={processedData.rows} metaTotal={metaTotal} />
                                         </div>
                                     </div>
 
-                                    {/* SECCIÓN 50/50: EQUILIBRIO DE PAREJA CON AJUSTE DEL PRIMER 10% DE ENTRADA */}
                                     <div class="bg-slate-900/40 p-6 rounded-3xl border border-slate-800 space-y-6">
                                         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                                             <div>
@@ -1297,7 +1239,6 @@
                                                 <p class="text-xs text-slate-400">Control estricto para que vuestras aportaciones acumuladas estén siempre en armonía</p>
                                             </div>
 
-                                            {/* Badge Dinámico de Compensación */}
                                             {processedData.balanceConsolidadoAsierALaura === 0 ? (
                                                 <span class="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-bold px-3 py-1.5 rounded-full">Balance Perfecto</span>
                                             ) : (
@@ -1307,7 +1248,6 @@
                                             )}
                                         </div>
 
-                                        {/* Desglose detallado del primer 10% de entrada (Laura 33k vs Asier 10k) */}
                                         <div class="bg-slate-950/80 p-5 rounded-2xl border border-slate-800/80 space-y-4">
                                             <h4 class="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
                                                 <span class="w-2 h-2 rounded-full bg-amber-400"></span> Ajuste de Entrada del primer 10%
@@ -1328,7 +1268,6 @@
                                                 </div>
                                             </div>
 
-                                            {/* Repagos poco a poco */}
                                             <div class="p-4 bg-slate-900/60 rounded-xl border border-slate-850 flex flex-col md:flex-row items-center justify-between gap-4">
                                                 <div class="space-y-1">
                                                     <span class="text-slate-300 font-extrabold text-xs block">¿Cuánto ha devuelto Asier a Laura poco a poco?</span>
@@ -1355,47 +1294,43 @@
                                             </div>
                                         </div>
 
-                                        {/* CUENTA MENSUAL REVOLUT ACTUAL */}
                                         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                            {/* Bloque Laura */}
                                             <div class="bg-slate-900/60 p-5 rounded-2xl border border-slate-800 relative">
                                                 <span class="absolute top-4 right-4 text-xs font-black text-pink-400 bg-pink-500/10 px-2 py-0.5 rounded-md">Laura</span>
                                                 <span class="text-xs font-bold text-slate-400">Ahorro Mensual Acumulado</span>
                                                 <div class="text-2xl font-black text-white mt-1">{processedData.totalLaura.toLocaleString('es-ES')} €</div>
                                                 <div class="mt-4 flex justify-between text-xs text-slate-400">
-                                                    <span>Nóminas mensuales en Revolut: {((processedData.totalLaura / (processedData.totalLaura + processedData.totalAsier || 1)) * 100).toFixed(1)}%</span>
+                                                    <span>Nóminas en Revolut: {((processedData.totalLaura / (processedData.totalLaura + processedData.totalAsier || 1)) * 100).toFixed(1)}%</span>
                                                 </div>
                                             </div>
 
-                                            {/* Bloque Asier */}
                                             <div class="bg-slate-900/60 p-5 rounded-2xl border border-slate-800 relative">
                                                 <span class="absolute top-4 right-4 text-xs font-black text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded-md">Asier</span>
                                                 <span class="text-xs font-bold text-slate-400">Ahorro Mensual Acumulado</span>
                                                 <div class="text-2xl font-black text-white mt-1">{processedData.totalAsier.toLocaleString('es-ES')} €</div>
                                                 <div class="mt-4 flex justify-between text-xs text-slate-400">
-                                                    <span>Nóminas mensuales en Revolut: {((processedData.totalAsier / (processedData.totalLaura + processedData.totalAsier || 1)) * 100).toFixed(1)}%</span>
+                                                    <span>Nóminas en Revolut: {((processedData.totalAsier / (processedData.totalLaura + processedData.totalAsier || 1)) * 100).toFixed(1)}%</span>
                                                 </div>
                                             </div>
                                         </div>
 
-                                        {/* CAJA DE COMPENSACIÓN CONSOLIDADA FINAL (Combines 10% debt + Monthly saving imbalance) */}
                                         {processedData.balanceConsolidadoAsierALaura !== 0 && (
                                             <div class="bg-indigo-500/5 border border-indigo-500/15 p-5 rounded-2xl space-y-3 text-xs">
                                                 <div class="flex items-center gap-3.5">
                                                     <span class="p-2 bg-indigo-500/10 text-indigo-400 rounded-lg shrink-0">{SVGIcons.scale}</span>
                                                     <div>
                                                         <h4 class="font-extrabold text-white">Balance Neto Consolidado</h4>
-                                                        <p class="text-slate-400 text-[10px]">Cálculo integrado sumando el desequilibrio mensual de nóminas y la deuda pendiente de la primera entrada.</p>
+                                                        <p class="text-slate-400 text-[10px]">Cálculo integrado sumando el desequilibrio mensual y la deuda pendiente de la primera entrada.</p>
                                                     </div>
                                                 </div>
                                                 <div class="bg-slate-950 p-4 rounded-xl border border-slate-900 leading-relaxed text-slate-300">
                                                     {processedData.balanceConsolidadoAsierALaura > 0 ? (
                                                         <p>
-                                                            Teniendo en cuenta el historial mensual de Revolut y la diferencia del pago del primer hito, <strong class="text-indigo-400">Asier debe compensar un total neto de <span class="text-sm font-black text-indigo-300">{processedData.balanceConsolidadoAsierALaura.toLocaleString('es-ES', { minimumFractionDigits: 2 })} €</span> a Laura</strong> para estar en balance perfecto al 50/50.
+                                                            Teniendo en cuenta el historial mensual y la diferencia del pago del primer hito, <strong class="text-indigo-400">Asier debe compensar un total neto de <span class="text-sm font-black text-indigo-300">{processedData.balanceConsolidadoAsierALaura.toLocaleString('es-ES', { minimumFractionDigits: 2 })} €</span> a Laura</strong> para estar en balance perfecto al 50/50.
                                                         </p>
                                                     ) : (
                                                         <p>
-                                                            Teniendo en cuenta el historial mensual de Revolut y la diferencia del pago del primer hito, <strong class="text-indigo-400">Laura debe compensar un total neto de <span class="text-sm font-black text-indigo-300">{Math.abs(processedData.balanceConsolidadoAsierALaura).toLocaleString('es-ES', { minimumFractionDigits: 2 })} €</span> a Asier</strong> para estar en balance perfecto al 50/50.
+                                                            Teniendo en cuenta el historial mensual y la diferencia del pago del primer hito, <strong class="text-indigo-400">Laura debe compensar un total neto de <span class="text-sm font-black text-indigo-300">{Math.abs(processedData.balanceConsolidadoAsierALaura).toLocaleString('es-ES', { minimumFractionDigits: 2 })} €</span> a Asier</strong> para estar en balance perfecto al 50/50.
                                                         </p>
                                                     )}
                                                 </div>
@@ -1405,21 +1340,18 @@
                                 </div>
                             )}
 
-                            {/* PESTAÑA: CONTROL HISTÓRICO */}
                             {currentTab === 'simulation' && (
                                 <div class="space-y-6 animate-fadeIn">
                                     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                                         <div>
                                             <h2 class="text-lg font-bold text-white">Historial de Depósitos Mensuales Conjuntos</h2>
-                                            <p class="text-xs text-slate-400 font-medium">Añade vuestras nóminas e ingresos mensuales directos. Reemplaza de forma permanente vuestra hoja de cálculo.</p>
+                                            <p class="text-xs text-slate-400 font-medium">Añade vuestras nóminas e ingresos mensuales directos.</p>
                                         </div>
                                         <button onClick={addNewMonth} class="flex items-center gap-2 bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-extrabold px-4 py-2.5 rounded-xl transition shadow-lg shadow-cyan-500/20 shrink-0">
-                                            {SVGIcons.plus}
-                                            Registrar Mes
+                                            {SVGIcons.plus} Registrar Mes
                                         </button>
                                     </div>
 
-                                    {/* Formulario de Edición */}
                                     {editingMonth && (
                                         <div class="bg-slate-900 border border-cyan-500/30 rounded-3xl p-5 space-y-4 shadow-xl">
                                             <h3 class="font-bold text-cyan-400 flex items-center gap-1.5 text-sm">{SVGIcons.edit} Editar Mes Seleccionado</h3>
@@ -1452,7 +1384,6 @@
                                         </div>
                                     )}
 
-                                    {/* Tabla de registros */}
                                     <div class="bg-slate-900/30 rounded-3xl border border-slate-800/80 overflow-hidden shadow-xl">
                                         <div class="overflow-x-auto">
                                             <table class="w-full border-collapse text-left text-xs">
@@ -1499,7 +1430,6 @@
                                 </div>
                             )}
 
-                            {/* PESTAÑA: RINCÓN DE TRANQUILIDAD */}
                             {currentTab === 'projections' && (
                                 <div class="space-y-6 animate-fadeIn">
                                     <div class="bg-gradient-to-tr from-amber-600/10 via-amber-600/5 to-transparent p-6 rounded-3xl border border-amber-500/20">
@@ -1512,7 +1442,6 @@
                                         </div>
                                     </div>
 
-                                    {/* LÍNEA TEMPORAL VISUAL CON MONIGOTE */}
                                     <div class="bg-slate-900/60 p-6 rounded-3xl border border-slate-800 space-y-6">
                                         <div class="flex justify-between items-center">
                                             <div>
@@ -1527,7 +1456,6 @@
                                             </span>
                                         </div>
 
-                                        {/* Componente Gráfico de la Línea Temporal con Stickman */}
                                         <div class="p-2 bg-slate-950/80 rounded-2xl border border-slate-900/60">
                                             <InteractiveInteractiveTimeline 
                                                 contributions={contributions} 
@@ -1540,7 +1468,6 @@
                                         </div>
                                     </div>
 
-                                    {/* Panel de control Deslizante (Slider) */}
                                     <div class="bg-slate-900/60 p-6 rounded-3xl border border-slate-800 space-y-4">
                                         <div class="flex justify-between items-center text-xs">
                                             <span class="font-extrabold text-slate-400">Simulador de Ahorro Mensual Conjunto</span>
@@ -1562,7 +1489,6 @@
                                         </div>
                                     </div>
 
-                                    {/* Explicación de la ecuación de proyección temporal en LaTeX */}
                                     <div class="bg-slate-900/30 p-5 rounded-2xl border border-slate-800/80 text-xs text-slate-300">
                                         <h3 class="font-bold text-white mb-2 uppercase tracking-wide">Fórmula de Proyección de Tiempo</h3>
                                         <p class="leading-relaxed mb-3">
@@ -1575,7 +1501,6 @@
                                 </div>
                             )}
 
-                            {/* PESTAÑA: FONDO MUEBLES (FURNITURE) */}
                             {currentTab === 'furniture' && (
                                 <div class="space-y-6 animate-fadeIn">
                                     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -1588,7 +1513,6 @@
                                         </div>
                                     </div>
 
-                                    {/* Añadir nuevo mueble */}
                                     <div class="bg-slate-900 border border-slate-800 rounded-3xl p-5 space-y-3.5">
                                         <h3 class="font-bold text-white text-xs uppercase tracking-wider">Añadir Nueva Partida de Mueble / Decoración</h3>
                                         <div class="grid grid-cols-1 sm:grid-cols-4 gap-3">
@@ -1628,7 +1552,6 @@
                                         </button>
                                     </div>
 
-                                    {/* Listado de partidas presupuestarias */}
                                     <div class="bg-slate-900/30 border border-slate-800 rounded-3xl overflow-hidden">
                                         <div class="divide-y divide-slate-900">
                                             {furnitureBudget.map((item) => (
@@ -1676,7 +1599,6 @@
                                 </div>
                             )}
 
-                            {/* PESTAÑA: PLAN DE HIPOTECA */}
                             {currentTab === 'mortgage' && (
                                 <div class="space-y-6 animate-fadeIn">
                                     <div class="bg-gradient-to-tr from-purple-600/10 via-purple-600/5 to-transparent p-6 rounded-3xl border border-purple-500/20">
@@ -1689,7 +1611,6 @@
                                         </div>
                                     </div>
 
-                                    {/* Explicación de la ecuación de amortización en LaTeX */}
                                     <div class="bg-slate-900/30 p-5 rounded-2xl border border-slate-800/80 text-xs text-slate-300">
                                         <h3 class="font-bold text-white mb-2 uppercase tracking-wide">Fórmula del Sistema de Amortización Francés</h3>
                                         <p class="leading-relaxed mb-3">
@@ -1700,7 +1621,6 @@
                                         </div>
                                     </div>
 
-                                    {/* Sliders de ajuste */}
                                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div class="bg-slate-900/60 p-5 rounded-2xl border border-slate-800 space-y-4">
                                             <div class="flex justify-between items-center text-xs font-bold">
@@ -1735,7 +1655,6 @@
                                         </div>
                                     </div>
 
-                                    {/* Resultados del Préstamo */}
                                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                                         <div class="bg-slate-900/40 p-5 rounded-2xl border border-slate-800">
                                             <span class="text-[10px] text-slate-400 font-extrabold uppercase">Importe Financiado (80%)</span>
@@ -1756,7 +1675,6 @@
                                         </div>
                                     </div>
 
-                                    {/* Consejos Viabilidad */}
                                     <div class="bg-slate-900/30 p-5 rounded-3xl border border-slate-800 text-xs text-slate-300 space-y-3">
                                         <h4 class="font-bold text-white uppercase tracking-wider">Regla del 30-35% de Endeudamiento Máximo</h4>
                                         <p class="leading-relaxed">
@@ -1770,10 +1688,8 @@
                                 </div>
                             )}
 
-                            {/* PESTAÑA: CONFIGURACIÓN Y SINCRONIZACIÓN NUBE */}
                             {currentTab === 'config' && (
                                 <div class="space-y-6 animate-fadeIn">
-                                    {/* Configuración de Aportaciones Iniciales del primer 10% */}
                                     <div class="bg-slate-900 border border-slate-800 rounded-3xl p-5 space-y-4 shadow-xl">
                                         <h3 class="font-bold text-white text-sm flex items-center gap-1.5">
                                             <span class="text-amber-400">{SVGIcons.scale}</span>
@@ -1812,7 +1728,6 @@
                                         </div>
                                     </div>
 
-                                    {/* Panel de Autenticación y Whitelist */}
                                     <div class="bg-slate-900 border border-slate-800 rounded-3xl p-5 space-y-4 shadow-xl">
                                         <h3 class="font-bold text-white text-sm flex items-center gap-1.5">
                                             <span class="text-cyan-400">{SVGIcons.lock}</span>
@@ -1850,7 +1765,6 @@
                                         </div>
                                     </div>
 
-                                    {/* Panel de Configuración de Intereses y Balance Conjunto */}
                                     <div class="bg-slate-900 border border-slate-800 rounded-3xl p-5 space-y-4 shadow-xl">
                                         <h3 class="font-bold text-white text-sm flex items-center gap-1.5">
                                             <span class="text-emerald-400">{SVGIcons.wallet}</span>
@@ -1901,14 +1815,8 @@
                                                 />
                                             </div>
                                         </div>
-                                        
-                                        <div class="bg-slate-950 p-4 rounded-xl border border-slate-900 text-xs text-slate-400 space-y-2">
-                                            <p class="font-bold text-white">¿Cómo funciona la automatización con impuestos?</p>
-                                            <p>El sistema calcula cuántos días han pasado desde la fecha de vuestro último cuadre hasta el día de hoy, y le aplica un interés compuesto diario de forma transparente sobre vuestro capital. De esta forma, el saldo que veis en la app estará siempre en perfecta armonía con vuestra cuenta real de Revolut sin tocar nada.</p>
-                                        </div>
                                     </div>
 
-                                    {/* Panel de Diagnóstico Firebase */}
                                     <div class="bg-slate-900 border border-slate-800 rounded-3xl p-5 space-y-4 shadow-xl">
                                         <h3 class="font-bold text-white text-sm flex items-center gap-1.5">
                                             <span class="text-cyan-400">{SVGIcons.settings}</span>
@@ -1916,7 +1824,6 @@
                                         </h3>
                                         
                                         <div class="space-y-3 text-xs">
-                                            {/* Paso 1: Librerías cargadas */}
                                             <div class="flex items-center justify-between p-2.5 bg-slate-950 rounded-xl border border-slate-900">
                                                 <span class="text-slate-400 font-medium">1. SDK de Firebase en Navegador</span>
                                                 {typeof firebase !== 'undefined' ? (
@@ -1926,7 +1833,6 @@
                                                 )}
                                             </div>
 
-                                            {/* Paso 2: Autenticación */}
                                             <div class="flex items-center justify-between p-2.5 bg-slate-950 rounded-xl border border-slate-900">
                                                 <span class="text-slate-400 font-medium">2. Estado de Sesión Protegida</span>
                                                 {isAuthenticated ? (
@@ -1936,7 +1842,6 @@
                                                 )}
                                             </div>
 
-                                            {/* Paso 3: Estado de Datos */}
                                             <div class="flex items-center justify-between p-2.5 bg-slate-950 rounded-xl border border-slate-800 flex items-center justify-between">
                                                 <span class="text-slate-400 font-medium">3. Sincronización en Tiempo Real</span>
                                                 {firebaseStatus === 'connected' ? (
@@ -1946,7 +1851,6 @@
                                                 )}
                                             </div>
 
-                                            {/* Error de Diagnóstico */}
                                             {firebaseError && (
                                                 <div class="bg-rose-500/10 border border-rose-500/20 p-4 rounded-xl space-y-2 animate-fadeIn">
                                                     <div class="text-rose-400 font-extrabold text-xs uppercase tracking-wider flex items-center gap-1.5">
@@ -1964,10 +1868,19 @@
                                                 onClick={uploadCurrentDataToFirebase} 
                                                 class="w-full bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-black py-2.5 rounded-xl transition shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-1.5"
                                             >
-                                                {SVGIcons.save}
-                                                Sincronizar mis datos actuales en Firebase
+                                                {SVGIcons.save} Sincronizar mis datos actuales en Firebase
                                             </button>
                                         )}
+                                    </div>
+                                    
+                                    <div class="bg-slate-900 border border-slate-800 rounded-3xl p-5 space-y-4 shadow-xl">
+                                        <h3 class="font-bold text-white text-sm">Carga vuestro Excel a Firebase (Respaldos .CSV)</h3>
+                                        <div class="flex items-center gap-3">
+                                            <input type="file" accept=".csv" onChange={handleCSVUpload} id="csvFileInput" class="hidden" />
+                                            <label htmlFor="csvFileInput" class="cursor-pointer bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition shadow-lg shadow-emerald-500/20">
+                                                Subir Archivo CSV de Cuentas
+                                            </label>
+                                        </div>
                                     </div>
                                 </div>
                             )}
@@ -1975,7 +1888,6 @@
                         </div>
                     </main>
 
-                    {/* PIE DE PÁGINA */}
                     <footer class="bg-slate-900 border-t border-slate-800/80 py-5 text-center text-[10px] text-slate-500 mt-auto uppercase tracking-wider font-semibold">
                         <p>© 2026 Panel de Control Financiero Familiar de Laura y Asier.</p>
                     </footer>
@@ -1983,7 +1895,6 @@
             );
         }
 
-        // --- SUBCOMPONENTE DE GRÁFICO VECTORIAL (SVG) EXTREMADAMENTE SEGURO Y COMPATIBLE ---
         function ResponsiveSVGChart({ rows, metaTotal }) {
             if (!rows || rows.length === 0) return null;
 
@@ -2055,11 +1966,9 @@
             );
         }
 
-        // --- COMPONENTE INTERACTIVO DE LÍNEA TEMPORAL DE LA CASA CON EL "MONIGOTE" EN EL DÍA EXACTO ---
-        function InteractiveInteractiveTimeline({ contributions, processedData, targetSaving, metaTotal, houseMetas, saldoInicial }) {
+        function ProjectTimeline({ contributions, processedData, targetSaving, metaTotal, houseMetas, saldoInicial }) {
             const totalMuebles = processedData.totalMueblesPresupuesto - processedData.totalMueblesGastado;
 
-            // Motor de Proyección de Hitos Dinámico
             const lastMonthIndex = contributions.length;
             const lastMonthAccumulated = processedData.totalAhorrado;
 
@@ -2069,7 +1978,7 @@
                     for (let i = 0; i < contributions.length; i++) {
                         sum += Number(contributions[i].laura) + Number(contributions[i].asier);
                         if (sum >= targetAmount) {
-                            return i + 1; // Month index (1-based)
+                            return i + 1; 
                         }
                     }
                     return 1;
@@ -2080,18 +1989,13 @@
                 }
             };
 
-            // Hito 1: Entrada (34.870 €)
             const indexEntrada = calculateMonthProjection(34870);
-            // Hito 2: IVA & Gastos (62.766 € acumulado)
             const indexIVA = calculateMonthProjection(34870 + 27896);
-            // Hito 3: Personalización (66.629,20 € acumulado)
             const indexPersonalizacion = calculateMonthProjection(metaTotal);
-            // Hito 4: Muebles Completos
             const indexMuebles = calculateMonthProjection(metaTotal + totalMuebles);
 
-            // Conversor de número de mes (1 = Marzo 2026) a etiqueta legible de mes y año
             const getMonthLabel = (idx) => {
-                const date = new Date(2026, 2, 1); // Marzo 1, 2026
+                const date = new Date(2026, 2, 1); 
                 date.setMonth(date.getMonth() + (idx - 1));
                 return date.toLocaleDateString('es-ES', { month: 'short', year: '2-digit' }).toUpperCase();
             };
@@ -2102,15 +2006,12 @@
                 return date.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' });
             };
 
-            // Eje de la línea temporal: Marzo 2026 (Mes 1) a Septiembre 2028 (Mes 31) -> 31 meses
             const mapIndexToPercentage = (idx) => {
                 return Math.max(0, Math.min(100, ((idx - 1) / 30) * 100));
             };
 
-            // Posición de hoy (16 de junio de 2026)
             const todayPercentage = 11.0; 
 
-            // Hitos con sus porcentajes y metadatos
             const timelineMilestones = [
                 {
                     id: 'entrada',
@@ -2120,7 +2021,7 @@
                     color: 'text-cyan-400',
                     bgColor: 'bg-cyan-500',
                     borderColor: 'border-cyan-500',
-                    isPast: indexEntrada <= 4, // Ya pasó de junio de 2026
+                    isPast: indexEntrada <= 4, 
                     deadlineOk: indexEntrada <= 31
                 },
                 {
@@ -2147,7 +2048,7 @@
                 },
                 {
                     id: 'muebles',
-                    label: 'muebles completos',
+                    label: 'Muebles Completos',
                     amount: `${totalMuebles.toLocaleString('es-ES')} €`,
                     index: indexMuebles,
                     color: 'text-pink-400',
@@ -2160,46 +2061,35 @@
 
             return (
                 <div class="space-y-8 py-6 px-4">
-                    {/* El carril de la línea temporal */}
                     <div class="relative w-full h-12 flex items-center">
-                        {/* Línea base de carril */}
                         <div class="absolute w-full h-1.5 bg-slate-800 rounded-full"></div>
-                        
-                        {/* Progreso completado de tiempo hasta HOY */}
                         <div class="absolute h-1.5 bg-gradient-to-r from-cyan-600 to-indigo-500 rounded-full" style={{ width: `${todayPercentage}%` }}></div>
 
-                        {/* PIN DE HOY: El Monigote Constructor 👷‍♂️ */}
                         <div class="absolute -translate-x-1/2 -top-1 z-30 flex flex-col items-center" style={{ left: `${todayPercentage}%` }}>
-                            {/* Globo interactivo */}
                             <div class="bg-indigo-600 text-white font-extrabold text-[9px] px-2 py-0.5 rounded-md mb-1 shadow-lg shadow-indigo-500/20 whitespace-nowrap animate-bounce uppercase">
                                 ¡Estáis aquí!
                             </div>
-                            {/* Monigote SVG */}
                             <div class="relative">
                                 <span class="absolute -inset-1 rounded-full bg-cyan-500/30 glowing-ring"></span>
                                 <svg class="w-6 h-6 text-yellow-400 drop-shadow" viewBox="0 0 24 24" fill="currentColor">
-                                    {/* Dibujo de monigote con casco de seguridad */}
                                     <circle cx="12" cy="8" r="4" fill="#fbbf24" />
-                                    <path d="M12 2a4 4 0 0 1 4 4h-8a4 4 0 0 1 4-4z" fill="#f59e0b" /> {/* Casco */}
-                                    <path d="M12 14c-4.418 0-8 2.239-8 5v3h16v-3c0-2.761-3.582-5-8-5z" fill="#38bdf8" /> {/* Cuerpo azul */}
+                                    <path d="M12 2a4 4 0 0 1 4 4h-8a4 4 0 0 1 4-4z" fill="#f59e0b" />
+                                    <path d="M12 14c-4.418 0-8 2.239-8 5v3h16v-3c0-2.761-3.582-5-8-5z" fill="#38bdf8" />
                                 </svg>
                             </div>
                         </div>
 
-                        {/* Hitos a lo largo del carril */}
                         {timelineMilestones.map((milestone) => {
                             const pct = mapIndexToPercentage(milestone.index);
                             const onTime = milestone.deadlineOk;
                             return (
                                 <div key={milestone.id} class="absolute -translate-x-1/2 flex flex-col items-center z-10" style={{ left: `${pct}%` }}>
-                                    {/* Marcador del punto */}
                                     <div class={`w-4 h-4 rounded-full border-2 bg-slate-950 flex items-center justify-center transition-all ${
                                         milestone.isPast ? 'border-emerald-500 bg-emerald-500/10' :
                                         onTime ? 'border-cyan-500 bg-cyan-500/10' : 'border-rose-500 bg-rose-500/10'
                                     }`}>
                                         <span class={`w-1.5 h-1.5 rounded-full ${milestone.isPast ? 'bg-emerald-400' : onTime ? 'bg-cyan-400' : 'bg-rose-500 animate-ping'}`}></span>
                                     </div>
-                                    {/* Etiqueta del mes debajo del carril */}
                                     <span class="text-[9px] font-black text-slate-400 mt-2 bg-slate-900 px-1 py-0.5 rounded border border-slate-800">
                                         {getMonthLabel(milestone.index)}
                                     </span>
@@ -2207,7 +2097,6 @@
                             );
                         })}
 
-                        {/* Hito Final Límite: Septiembre de 2028 */}
                         <div class="absolute right-0 -translate-x-1/2 flex flex-col items-center z-20">
                             <div class="w-5 h-5 rounded-lg bg-indigo-600 flex items-center justify-center text-white border border-indigo-500 shadow-md">
                                 🗝️
@@ -2218,7 +2107,6 @@
                         </div>
                     </div>
 
-                    {/* Explicación y desglose de los hitos proyectados en formato de tarjetas */}
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-8 pt-4">
                         {timelineMilestones.map((m) => {
                             const onTime = m.deadlineOk;
@@ -2231,13 +2119,13 @@
                                     <div class="flex items-start justify-between">
                                         <div class="space-y-1">
                                             <h4 class="text-xs font-black text-white uppercase tracking-wider">{m.label}</h4>
-                                            <p class="text-[10px] text-slate-400">Objetivo acumulado necesario: <strong class="text-white">{m.amount}</strong></p>
+                                            <p class="text-[10px] text-slate-400">Objetivo acumulado: <strong class="text-white">{m.amount}</strong></p>
                                         </div>
                                         <span class={`text-[9px] font-bold px-2 py-0.5 rounded-full ${
                                             isFinished ? 'bg-emerald-500/10 text-emerald-400' :
                                             onTime ? 'bg-cyan-500/10 text-cyan-400' : 'bg-rose-500/10 text-rose-400'
                                         }`}>
-                                            {isFinished ? '¡YA ALCANZADO!' : onTime ? 'A tiempo' : 'En riesgo (tarde)'}
+                                            {isFinished ? '¡YA ALCANZADO!' : onTime ? 'A tiempo' : 'En riesgo'}
                                         </span>
                                     </div>
                                     
@@ -2250,9 +2138,9 @@
                                         {isFinished ? (
                                             `Ya acumulasteis la cantidad correspondiente de este hito con las aportaciones registradas.`
                                         ) : onTime ? (
-                                            `Llegaréis con holgura de ${31 - m.index} meses antes del límite de firma establecido para el Q3 de 2028.`
+                                            `Llegaréis con holgura de ${31 - m.index} meses antes del límite de firma.`
                                         ) : (
-                                            `Al ritmo de ahorro fijado (€${targetSaving}/mes), este hito se retrasará hasta después del límite. Se recomienda aumentar el ahorro.`
+                                            `Al ritmo de ahorro fijado (€${targetSaving}/mes), este hito se retrasará hasta después del límite.`
                                         )}
                                     </div>
                                 </div>
@@ -2263,7 +2151,6 @@
             );
         }
 
-        // Renderizado inicial
         const container = document.getElementById('root');
         const root = ReactDOM.createRoot(container);
         root.render(<App />);
