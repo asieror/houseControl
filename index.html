@@ -21,7 +21,7 @@
     </script>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone@7.24.0/babel.min.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore-compat.js"></script>
@@ -31,6 +31,9 @@
     <div id="root" class="h-full"></div>
 
     <script type="text/babel">
+        /* @jsx React.createElement */
+        /* @jsxFrag React.Fragment */
+
         // --- CONFIGURACIÓN DE FIREBASE ---
         const firebaseConfig = {
             apiKey: "TU_API_KEY",
@@ -41,7 +44,7 @@
             appId: "TU_APP_ID"
         };
 
-        // Inicializar Firebase
+        // Inicializar Firebase de forma segura
         if (!firebase.apps.length) {
             firebase.initializeApp(firebaseConfig);
         }
@@ -117,7 +120,7 @@
                             loadDataFromFirestore();
                         } else {
                             auth.signOut();
-                            setAuthError("Acceso denegado: Tu email no está en la lista de autorizados.");
+                            setAuthError("Acceso denegado: Email no autorizado.");
                         }
                     })
                     .catch((error) => {
@@ -133,7 +136,7 @@
                 });
             };
 
-            // --- CARGAR Y GUARDAR DATOS EN FIRESTORE ---
+            // --- PERSISTENCIA FIRESTORE ---
             const loadDataFromFirestore = () => {
                 db.collection("vivienda_segura").doc("dashboard").get()
                     .then((doc) => {
@@ -159,8 +162,8 @@
 
             const syncToFirestore = (updatedFields) => {
                 db.collection("vivienda_segura").doc("dashboard").set(updatedFields, { merge: true })
-                    .then(() => console.log("Firestore Sincronizado"))
-                    .catch((err) => console.error("Error al guardar en Firestore: ", err));
+                    .then(() => console.log("Sincronizado con éxito"))
+                    .catch((err) => console.error("Error sincronizando: ", err));
             };
 
             React.useEffect(() => {
@@ -172,7 +175,7 @@
                 }
             }, [revolutBase, tin, daysElapsed, refunds, months, mortgage, furniture, user]);
 
-            // --- LÓGICA DE FINANZAS Y CÁLCULOS ---
+            // --- LÓGICA DE NEGOCIO ---
             const totalInteresesBrutos = revolutBase * Math.pow(1 + (tin / 100) / 365, daysElapsed) - revolutBase;
             const irpfRetencion = totalInteresesBrutos * 0.19;
             const revolutNeto = revolutBase + (totalInteresesBrutos - irpfRetencion);
@@ -181,7 +184,7 @@
             const deudaInicialAsier = (initialLaura - initialAsier) / 2;
             const deudaActualAsier = deudaInicialAsier - totalRefunds;
 
-            // CRUD Historial Mensual
+            // Handlers CRUD Mensual
             const handleAddMonth = (e) => {
                 e.preventDefault();
                 if (!newMonth.id) return;
@@ -205,6 +208,7 @@
                 setMonths(months.filter(m => m.id !== id));
             };
 
+            // Handlers Reembolsos Equidad
             const handleAddRefund = (e) => {
                 e.preventDefault();
                 if (!newRefund.amount) return;
@@ -217,12 +221,12 @@
                 setRefunds(refunds.filter(r => r.id !== id));
             };
 
-            // Hipoteca Francesa
+            // Simulador Francés Hipoteca
             const r_rate = (mortgage.interest / 100) / 12;
             const n_months = mortgage.years * 12;
             const cuotaMensualHipoteca = r_rate === 0 ? (mortgage.capital / n_months) : (mortgage.capital * r_rate * Math.pow(1 + r_rate, n_months)) / (Math.pow(1 + r_rate, n_months) - 1);
 
-            // Muebles
+            // Gestión Mobiliario
             const handleAddFurniture = (e) => {
                 e.preventDefault();
                 if (!newFurniture.item || !newFurniture.cost) return;
@@ -236,7 +240,7 @@
             };
             const totalFurnitureCost = furniture.reduce((acc, curr) => acc + curr.cost, 0);
 
-            // --- RENDER VISTA LOGIN ---
+            // --- VISTAS DE RENDERIZADO ---
             if (!user || !pinAuthenticated) {
                 return (
                     <div className="flex flex-col items-center justify-center min-h-screen px-4 bg-slate-950">
@@ -273,7 +277,7 @@
                                 </form>
                             ) : (
                                 <div className="space-y-4">
-                                    <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400 text-center mb-1">Paso 2: Cuenta Personal Identificada</label>
+                                    <label className="block text-xs font-semibold uppercase tracking-wider text-slate-400 text-center mb-1">Paso 2: Autenticación Identificada</label>
                                     <button 
                                         onClick={handleGoogleLogin}
                                         className="w-full flex items-center justify-center gap-3 py-3 bg-white hover:bg-slate-100 text-slate-900 font-semibold rounded-xl shadow-md transition-all"
@@ -290,7 +294,6 @@
                 );
             }
 
-            // --- RENDER DASHBOARD PRINCIPAL ---
             return (
                 <div className="min-h-screen flex flex-col bg-slate-950 text-slate-100">
                     <header className="border-b border-slate-800 bg-slate-900/50 backdrop-blur sticky top-0 z-50 px-6 py-4 flex flex-col sm:flex-row justify-between items-center gap-4">
@@ -313,7 +316,7 @@
                     </header>
 
                     <main className="flex-1 p-6 space-y-6 max-w-7xl mx-auto w-full">
-                        {/* REVOLUT + COMTADO INTERESES */}
+                        {/* REVOLUT CARD */}
                         <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                             <div className="lg:col-span-1 bg-slate-900 border border-slate-800 rounded-2xl p-6 flex flex-col justify-between">
                                 <div>
@@ -516,9 +519,9 @@
             );
         }
 
-        // Renderizado Limpio en el DOM
+        // Renderizado clásico directo
         const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<App />);
+        root.render(React.createElement(App));
     </script>
 </body>
 </html>
