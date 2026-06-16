@@ -5,16 +5,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Casa Control - Gestión de Gastos, Entrada e Hipoteca</title>
     
-    <!-- Bloqueador de Avisos (Warnings) en Consola -->
+    <!-- Bloqueador de Avisos en Consola -->
     <script>
-        const originalWarn = console.warn;
-        console.warn = function(...args) {
-            if (typeof args[0] === 'string') {
-                if (args[0].includes('cdn.tailwindcss.com should not be used in production')) return;
-                if (args[0].includes('You are using the in-browser Babel transformer')) return;
-            }
-            originalWarn.apply(console, args);
-        };
+        (function() {
+            var originalWarn = console.warn;
+            console.warn = function() {
+                var message = Array.prototype.slice.call(arguments).join(' ');
+                if (message.indexOf('cdn.tailwindcss.com') !== -1 || message.indexOf('Babel transformer') !== -1) {
+                    return; 
+                }
+                originalWarn.apply(console, arguments);
+            };
+        })();
     </script>
 
     <!-- Tailwind CSS -->
@@ -63,6 +65,7 @@
 
     <div id="root" class="min-h-screen flex flex-col bg-slate-950"></div>
 
+    <!-- Script de React 100% libre de async/await para evitar errores del compilador -->
     <script type="text/babel">
         const { useState, useEffect, useRef, useMemo } = React;
 
@@ -95,7 +98,7 @@
             { id: "m17", name: "Julio (Año 2)", laura: 800, asier: 1500, revolut: 18801, simulacion: 1685 },
             { id: "m18", name: "Agosto (Año 2)", laura: 800, asier: 2000, revolut: 19940, simulacion: 1527 },
             { id: "m19", name: "Septiembre (Año 2)", laura: 800, asier: 1500, revolut: 20580, simulacion: 1450 },
-            { id: "m20", name: "Octubre (Año 2)", laura: 800, asier: 1500, revolut: 10531.27, simulacion: 1373 }
+            { id: "m20", name: "Octubre (Año 2)", laura: 800, asier: 1500, revolut: 10531.27, simulacion: 1373 } // Saldo real ajustado
         ];
 
         const DEFAULT_FURNITURE_BUDGET = [
@@ -133,7 +136,6 @@
         };
 
         function App() {
-            // --- ESTADOS DE CONTROL Y CONFIGURACIÓN ---
             const [currentTab, setCurrentTab] = useState('dashboard');
             const [metaTotal, setMetaTotal] = useState(DEFAULT_META_TOTAL);
             const [saldoInicial, setSaldoInicial] = useState(DEFAULT_SALDO_INICIAL);
@@ -141,41 +143,33 @@
             const [houseMetas, setHouseMetas] = useState(DEFAULT_METAS);
             const [furnitureBudget, setFurnitureBudget] = useState(DEFAULT_FURNITURE_BUDGET);
             
-            // Corrector e Interés diario de Revolut (AUTOMATIZADO AL 1.15% ANUAL CON RETENCIÓN DEL 19%)
             const [revolutCorrection, setRevolutCorrection] = useState(0.00); 
             const [revolutCorrectionReason, setRevolutCorrectionReason] = useState("Ajuste inicial de saldo real de Revolut");
-            const [annualInterestRate, setAnnualInterestRate] = useState(1.15); // 1.15% Anual
-            const [taxRatePercentage, setTaxRatePercentage] = useState(19.00); // 19% de retención del IRPF en España
+            const [annualInterestRate, setAnnualInterestRate] = useState(1.15);
+            const [taxRatePercentage, setTaxRatePercentage] = useState(19.00);
             const [reconciliationDate, setReconciliationDate] = useState("2026-06-01"); 
             const [liveSeconds, setLiveSeconds] = useState(0); 
 
-            // --- ESTADOS DE APORTACIÓN INICIAL DE ENTRADA (LAURA vs ASIER) ---
-            const [lauraInitialPayment, setLauraInitialPayment] = useState(33000); // Laura puso 33.000 €
-            const [asierInitialPayment, setAsierInitialPayment] = useState(10000); // Asier puso 10.000 €
-            const [repaidToLaura, setRepaidToLaura] = useState(0); // Cantidad que Asier ya ha devuelto poco a poco
+            const [lauraInitialPayment, setLauraInitialPayment] = useState(33000);
+            const [asierInitialPayment, setAsierInitialPayment] = useState(10000);
+            const [repaidToLaura, setRepaidToLaura] = useState(0);
 
-            // Autenticación de usuarios Whitelist
             const [user, setUser] = useState(null);
             const [userEmail, setUserEmail] = useState("");
             const [allowedEmails, setAllowedEmails] = useState(["asier@gmail.com", "laura@gmail.com"]);
             const [familyPin, setFamilyPin] = useState("1234");
             const [isAuthenticated, setIsAuthenticated] = useState(false);
             
-            // Estados para Login y Registro
             const [loginEmailInput, setLoginEmailInput] = useState("");
             const [loginPasswordInput, setLoginPasswordInput] = useState("");
             const [isRegisterMode, setIsRegisterMode] = useState(false);
             const [loginPinInput, setLoginPinInput] = useState("");
             const [loginError, setLoginError] = useState("");
 
-            // Proyección dinámica
             const [targetMonthlySaving, setTargetMonthlySaving] = useState(2300);
-
-            // Simulación Hipoteca
             const [interestRate, setInterestRate] = useState(3.00);
             const [loanTermYears, setLoanTermYears] = useState(30);
 
-            // Firebase setup states
             const [firebaseConfig, setFirebaseConfig] = useState(() => {
                 const saved = localStorage.getItem('casa_firebase_config');
                 return saved ? JSON.parse(saved) : DEFAULT_FIREBASE_CREDENTIALS;
@@ -184,12 +178,10 @@
             const [firebaseConfigForm, setFirebaseConfigForm] = useState(DEFAULT_FIREBASE_CREDENTIALS);
             const [firebaseError, setFirebaseError] = useState(null);
 
-            // Estados temporales locales para evitar bloqueos
             const [tempCorrection, setTempCorrection] = useState("0.00");
             const [tempCorrectionReason, setTempCorrectionReason] = useState("Ajuste inicial de saldo real de Revolut");
             const [tempRepaidAmount, setTempRepaidAmount] = useState("0");
             
-            // Estado para nuevas partidas de muebles
             const [newFurniture, setNewFurniture] = useState({ category: "", item: "", amount: 0, priority: "Media" });
 
             useEffect(() => {
@@ -198,7 +190,6 @@
                 setTempRepaidAmount(repaidToLaura.toString());
             }, [revolutCorrection, revolutCorrectionReason, repaidToLaura]);
 
-            // Notificaciones
             const [notifications, setNotifications] = useState([]);
             const addNotification = (message, type = 'success') => {
                 const id = Date.now();
@@ -211,7 +202,6 @@
             const dbRef = useRef(null);
             const syncUnsubscribe = useRef(null);
 
-            // Reloj para actualización pasiva de intereses
             useEffect(() => {
                 const interval = setInterval(() => {
                     setLiveSeconds(prev => prev + 1);
@@ -278,14 +268,14 @@
                 }
             };
 
-            // Disparar renderizado de LaTeX
             useEffect(() => {
                 if (window.MathJax && window.MathJax.typesetPromise) {
                     window.MathJax.typesetPromise().catch((err) => console.log(err));
                 }
             }, [currentTab, interestRate, loanTermYears, targetMonthlySaving]);
 
-            const connectFirebase = async (config) => {
+            // Función de conexión sincrónica (Sin async/await para evitar errores de compilación)
+            const connectFirebase = (config) => {
                 setFirebaseStatus('connecting');
                 setFirebaseError(null);
                 try {
@@ -353,7 +343,6 @@
                             if (data.reconciliationDate !== undefined) setReconciliationDate(data.reconciliationDate);
                             if (data.allowedEmails !== undefined) setAllowedEmails(data.allowedEmails);
                             if (data.familyPin !== undefined) setFamilyPin(data.familyPin);
-
                             if (data.lauraInitialPayment !== undefined) setLauraInitialPayment(data.lauraInitialPayment);
                             if (data.asierInitialPayment !== undefined) setAsierInitialPayment(data.asierInitialPayment);
                             if (data.repaidToLaura !== undefined) {
@@ -391,13 +380,13 @@
                 }
             };
 
-            const persistData = async (updatedContribs, updatedMeta, updatedSaldo, updatedMetas, updatedFurniture, updatedCorr, updatedReason, updatedIntRate, updatedRecDate, updatedEmails, updatedPin, updatedLauraInit, updatedAsierInit, updatedRepaid, updatedTaxRate) => {
+            // Escritura sincrónica mediante Promesas limpias (Sin async/await)
+            const persistData = (updatedContribs, updatedMeta, updatedSaldo, updatedMetas, updatedFurniture, updatedCorr, updatedReason, updatedIntRate, updatedRecDate, updatedEmails, updatedPin, updatedLauraInit, updatedAsierInit, updatedRepaid, updatedTaxRate) => {
                 const mTotal = updatedMeta !== undefined ? updatedMeta : metaTotal;
                 const sInicial = updatedSaldo !== undefined ? updatedSaldo : saldoInicial;
                 const listContribs = updatedContribs !== undefined ? updatedContribs : contributions;
                 const hMetas = updatedMetas !== undefined ? updatedMetas : houseMetas;
                 const fBudget = updatedFurniture !== undefined ? updatedFurniture : furnitureBudget;
-                
                 const rCorr = updatedCorr !== undefined ? updatedCorr : revolutCorrection;
                 const rReason = updatedReason !== undefined ? updatedReason : revolutCorrectionReason;
                 const aIntRate = updatedIntRate !== undefined ? updatedIntRate : annualInterestRate;
@@ -405,35 +394,32 @@
                 const rDate = updatedRecDate !== undefined ? updatedRecDate : reconciliationDate;
                 const aEmails = updatedEmails !== undefined ? updatedEmails : allowedEmails;
                 const fPin = updatedPin !== undefined ? updatedPin : familyPin;
-
                 const lInit = updatedLauraInit !== undefined ? updatedLauraInit : lauraInitialPayment;
                 const aInit = updatedAsierInit !== undefined ? updatedAsierInit : asierInitialPayment;
                 const repaid = updatedRepaid !== undefined ? updatedRepaid : repaidToLaura;
 
                 if (firebaseStatus === 'connected' && dbRef.current) {
-                    try {
-                        const appIdSlug = firebaseConfig.projectId || 'housecontrol-2bace';
-                        
-                        await dbRef.current.collection('artifacts').doc(appIdSlug).collection('public').doc('data').collection('config').doc('meta_config').set({
-                            metaTotal: mTotal,
-                            saldoInicial: sInicial,
-                            houseMetas: hMetas,
-                            furnitureBudget: fBudget,
-                            revolutCorrection: rCorr,
-                            revolutCorrectionReason: rReason,
-                            annualInterestRate: aIntRate,
-                            taxRatePercentage: tRate,
-                            reconciliationDate: rDate,
-                            allowedEmails: aEmails,
-                            familyPin: fPin,
-                            lauraInitialPayment: lInit,
-                            asierInitialPayment: aInit,
-                            repaidToLaura: repaid
-                        });
-
-                        for (let i = 0; i < listContribs.length; i++) {
-                            const month = listContribs[i];
-                            await dbRef.current.collection('artifacts').doc(appIdSlug).collection('public').doc('data').collection('contributions').doc(month.id).set({
+                    const appIdSlug = firebaseConfig.projectId || 'housecontrol-2bace';
+                    return dbRef.current.collection('artifacts').doc(appIdSlug).collection('public').doc('data').collection('config').doc('meta_config').set({
+                        metaTotal: mTotal,
+                        saldoInicial: sInicial,
+                        houseMetas: hMetas,
+                        furnitureBudget: fBudget,
+                        revolutCorrection: rCorr,
+                        revolutCorrectionReason: rReason,
+                        annualInterestRate: aIntRate,
+                        taxRatePercentage: tRate,
+                        reconciliationDate: rDate,
+                        allowedEmails: aEmails,
+                        familyPin: fPin,
+                        lauraInitialPayment: lInit,
+                        asierInitialPayment: aInit,
+                        repaidToLaura: repaid
+                    }).then(() => {
+                        const batch = dbRef.current.batch();
+                        listContribs.forEach((month, i) => {
+                            const docRef = dbRef.current.collection('artifacts').doc(appIdSlug).collection('public').doc('data').collection('contributions').doc(month.id);
+                            batch.set(docRef, {
                                 name: month.name,
                                 laura: Number(month.laura),
                                 asier: Number(month.asier),
@@ -441,17 +427,17 @@
                                 simulacion: Number(month.simulacion),
                                 order: i
                             });
-                        }
-                    } catch (err) {
+                        });
+                        return batch.commit();
+                    }).catch((err) => {
                         console.error("Error persistiendo datos en Firebase:", err);
-                    }
+                    });
                 } else {
                     localStorage.setItem('casa_local_contributions', JSON.stringify(listContribs));
                     localStorage.setItem('casa_local_meta', mTotal.toString());
                     localStorage.setItem('casa_local_saldo', sInicial.toString());
                     localStorage.setItem('casa_local_metas', JSON.stringify(hMetas));
                     localStorage.setItem('casa_local_furniture', JSON.stringify(fBudget));
-
                     localStorage.setItem('casa_local_revolut_correction', rCorr.toString());
                     localStorage.setItem('casa_local_revolut_reason', rReason);
                     localStorage.setItem('casa_local_revolut_intrate', aIntRate.toString());
@@ -459,10 +445,10 @@
                     localStorage.setItem('casa_local_revolut_recdate', rDate);
                     localStorage.setItem('casa_local_allowed_emails', JSON.stringify(aEmails));
                     localStorage.setItem('casa_local_family_pin', fPin);
-
                     localStorage.setItem('casa_local_laura_initial', lInit.toString());
                     localStorage.setItem('casa_local_asier_initial', aInit.toString());
                     localStorage.setItem('casa_local_repaid_laura', repaid.toString());
+                    return Promise.resolve();
                 }
             };
 
@@ -575,21 +561,23 @@
                 addNotification("Sesión cerrada", "info");
             };
 
-            const uploadCurrentDataToFirebase = async () => {
+            const uploadCurrentDataToFirebase = () => {
                 if (!dbRef.current) {
                     addNotification("No conectado a Firebase.", "error");
                     return;
                 }
-                try {
-                    addNotification("Sincronizando datos con la Nube...", "info");
-                    await persistData(contributions, metaTotal, saldoInicial, houseMetas, furnitureBudget, revolutCorrection, revolutCorrectionReason, annualInterestRate, reconciliationDate, allowedEmails, familyPin, lauraInitialPayment, asierInitialPayment, repaidToLaura, taxRatePercentage);
-                    addNotification("¡Todos tus datos han sido sincronizados y guardados en Firebase!", "success");
-                } catch (err) {
-                    console.error("Error al inicializar base de datos:", err);
-                    addNotification("Error al escribir datos. Revisa las reglas de seguridad de Firestore.", "error");
-                }
+                addNotification("Sincronizando datos con la Nube...", "info");
+                persistData(contributions, metaTotal, saldoInicial, houseMetas, furnitureBudget, revolutCorrection, revolutCorrectionReason, annualInterestRate, reconciliationDate, allowedEmails, familyPin, lauraInitialPayment, asierInitialPayment, repaidToLaura, taxRatePercentage)
+                    .then(() => {
+                        addNotification("¡Todos tus datos han sido sincronizados y guardados en Firebase!", "success");
+                    })
+                    .catch((err) => {
+                        console.error("Error al inicializar base de datos:", err);
+                        addNotification("Error al escribir datos. Revisa las reglas de seguridad de Firestore.", "error");
+                    });
             };
 
+            // --- CÁLCULOS DINÁMICOS DE APORTACIONES E INTERESES CON RETENCIÓN ---
             const processedData = useMemo(() => {
                 let currentAccumulated = saldoInicial;
                 let totalLaura = 0;
@@ -1457,7 +1445,7 @@
                                         </div>
 
                                         <div class="p-2 bg-slate-950/80 rounded-2xl border border-slate-900/60">
-                                            <InteractiveInteractiveTimeline 
+                                            <ProjectTimeline 
                                                 contributions={contributions} 
                                                 processedData={processedData}
                                                 targetSaving={targetMonthlySaving}
@@ -1708,7 +1696,7 @@
                                                     onChange={e => {
                                                         const val = parseFloat(e.target.value) || 0;
                                                         setLauraInitialPayment(val);
-                                                        persistData(contributions, metaTotal, saldoInicial, houseMetas, furnitureBudget, revolutCorrection, revolutCorrectionReason, annualInterestRate, reconciliationDate, allowedEmails, familyPin, val);
+                                                        persistData(contributions, metaTotal, saldoInicial, houseMetas, furnitureBudget, revolutCorrection, revolutCorrectionReason, annualInterestRate, reconciliationDate, allowedEmails, familyPin, val, asierInitialPayment, repaidToLaura, taxRatePercentage);
                                                     }}
                                                 />
                                             </div>
@@ -1721,7 +1709,7 @@
                                                     onChange={e => {
                                                         const val = parseFloat(e.target.value) || 0;
                                                         setAsierInitialPayment(val);
-                                                        persistData(contributions, metaTotal, saldoInicial, houseMetas, furnitureBudget, revolutCorrection, revolutCorrectionReason, annualInterestRate, reconciliationDate, allowedEmails, familyPin, lauraInitialPayment, val);
+                                                        persistData(contributions, metaTotal, saldoInicial, houseMetas, furnitureBudget, revolutCorrection, revolutCorrectionReason, annualInterestRate, reconciliationDate, allowedEmails, familyPin, lauraInitialPayment, val, repaidToLaura, taxRatePercentage);
                                                     }}
                                                 />
                                             </div>
@@ -1746,7 +1734,7 @@
                                                     onChange={e => {
                                                         const clean = e.target.value.split(',').map(em => em.trim().toLowerCase()).filter(em => em.length > 0);
                                                         setAllowedEmails(clean);
-                                                        persistData(contributions, metaTotal, saldoInicial, houseMetas, furnitureBudget, revolutCorrection, revolutCorrectionReason, annualInterestRate, reconciliationDate, clean);
+                                                        persistData(contributions, metaTotal, saldoInicial, houseMetas, furnitureBudget, revolutCorrection, revolutCorrectionReason, annualInterestRate, reconciliationDate, clean, familyPin, lauraInitialPayment, asierInitialPayment, repaidToLaura, taxRatePercentage);
                                                     }} 
                                                 />
                                             </div>
@@ -1758,7 +1746,7 @@
                                                     value={familyPin} 
                                                     onChange={e => {
                                                         setFamilyPin(e.target.value);
-                                                        persistData(contributions, metaTotal, saldoInicial, houseMetas, furnitureBudget, revolutCorrection, revolutCorrectionReason, annualInterestRate, reconciliationDate, allowedEmails, e.target.value);
+                                                        persistData(contributions, metaTotal, saldoInicial, houseMetas, furnitureBudget, revolutCorrection, revolutCorrectionReason, annualInterestRate, reconciliationDate, allowedEmails, e.target.value, lauraInitialPayment, asierInitialPayment, repaidToLaura, taxRatePercentage);
                                                     }} 
                                                 />
                                             </div>
@@ -1784,7 +1772,7 @@
                                                     onChange={e => {
                                                         const val = Number(e.target.value);
                                                         setAnnualInterestRate(val);
-                                                        persistData(contributions, metaTotal, saldoInicial, houseMetas, furnitureBudget, revolutCorrection, revolutCorrectionReason, val);
+                                                        persistData(contributions, metaTotal, saldoInicial, houseMetas, furnitureBudget, revolutCorrection, revolutCorrectionReason, val, reconciliationDate, allowedEmails, familyPin, lauraInitialPayment, asierInitialPayment, repaidToLaura, taxRatePercentage);
                                                     }}
                                                 />
                                             </div>
@@ -1810,7 +1798,7 @@
                                                     value={reconciliationDate}
                                                     onChange={e => {
                                                         setReconciliationDate(e.target.value);
-                                                        persistData(contributions, metaTotal, saldoInicial, houseMetas, furnitureBudget, revolutCorrection, revolutCorrectionReason, annualInterestRate, e.target.value);
+                                                        persistData(contributions, metaTotal, saldoInicial, houseMetas, furnitureBudget, revolutCorrection, revolutCorrectionReason, annualInterestRate, e.target.value, allowedEmails, familyPin, lauraInitialPayment, asierInitialPayment, repaidToLaura, taxRatePercentage);
                                                     }}
                                                 />
                                             </div>
