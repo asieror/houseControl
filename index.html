@@ -74,6 +74,52 @@
         ];
         const DEFAULT_SALDO_INICIAL = 8164.00;
 
+        const monthsList = [
+            "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+            "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
+        ];
+
+        const parseMonthName = (name) => {
+            let selectedMonth = "Enero";
+            let selectedYear = "2026";
+            if (name) {
+                const foundMonth = monthsList.find(m => name.toLowerCase().includes(m.toLowerCase()));
+                if (foundMonth) {
+                    selectedMonth = foundMonth;
+                }
+                const yearMatch = name.match(/\b(20\d{2})\b/);
+                if (yearMatch) {
+                    selectedYear = yearMatch[1];
+                } else {
+                    const anoMatch = name.match(/Año\s*(\d+)/i);
+                    if (anoMatch) {
+                        const yearNum = parseInt(anoMatch[1]);
+                        selectedYear = String(2025 + yearNum);
+                    }
+                }
+            }
+            return { month: selectedMonth, year: selectedYear };
+        };
+
+        const getNextMonthAndYear = (contributions) => {
+            if (!contributions || contributions.length === 0) {
+                const now = new Date();
+                const month = monthsList[now.getMonth()];
+                const year = String(now.getFullYear());
+                return { month, year };
+            }
+            const lastMonth = contributions[contributions.length - 1];
+            const parsed = parseMonthName(lastMonth.name);
+            const lastMonthIdx = monthsList.indexOf(parsed.month);
+            let nextMonthIdx = lastMonthIdx + 1;
+            let nextYear = parseInt(parsed.year);
+            if (nextMonthIdx >= 12) {
+                nextMonthIdx = 0;
+                nextYear += 1;
+            }
+            return { month: monthsList[nextMonthIdx], year: String(nextYear) };
+        };
+
         const DEFAULT_CONTRIBUTIONS = [
             { id: "m1", name: "Marzo (Año 1)", laura: 1266, asier: 850, revolut: 8620, simulacion: 2012 },
             { id: "m2", name: "Abril (Año 1)", laura: 1266, asier: 850, revolut: 9075, simulacion: 2009 },
@@ -185,7 +231,12 @@
             const [tempRepaidAmount, setTempRepaidAmount] = useState("0");
             
             const [editingMonth, setEditingMonth] = useState(null);
-            const [editForm, setEditForm] = useState({ name: "", laura: 0, asier: 0, revolut: 0, simulacion: 0 });
+            const [editForm, setEditForm] = useState({ month: "Enero", year: "2026", laura: 0, asier: 0, revolut: 0, simulacion: 0 });
+            const [isRevolutManuallyEdited, setIsRevolutManuallyEdited] = useState(false);
+
+            const [isAddingMonth, setIsAddingMonth] = useState(false);
+            const [newMonthForm, setNewMonthForm] = useState({ month: "Enero", year: "2026", laura: 0, asier: 0, revolut: 0, simulacion: 0 });
+            const [isNewRevolutManuallyEdited, setIsNewRevolutManuallyEdited] = useState(false);
             
             const [newFurniture, setNewFurniture] = useState({ category: "", item: "", amount: 0, priority: "Media" });
             
@@ -706,12 +757,35 @@
                 };
             }, [interestRate, loanTermYears]);
 
+            const getPrevRevolutForEdit = (monthId) => {
+                const idx = contributions.findIndex(c => c.id === monthId);
+                if (idx > 0) {
+                    return Number(contributions[idx - 1].revolut);
+                }
+                return saldoInicial;
+            };
+
+            const startEdit = (row) => {
+                const parsed = parseMonthName(row.name);
+                setEditForm({
+                    month: parsed.month,
+                    year: parsed.year,
+                    laura: row.laura,
+                    asier: row.asier,
+                    revolut: row.revolut,
+                    simulacion: row.simulacion
+                });
+                setIsRevolutManuallyEdited(false);
+                setEditingMonth(row.id);
+            };
+
             const saveEdit = () => {
+                const newMonthName = `${editForm.month} ${editForm.year}`;
                 const updated = contributions.map(c => {
                     if (c.id === editingMonth) {
                         return {
                             ...c,
-                            name: editForm.name,
+                            name: newMonthName,
                             laura: Number(editForm.laura),
                             asier: Number(editForm.asier),
                             revolut: Number(editForm.revolut),
@@ -727,28 +801,66 @@
             };
 
             const addNewMonth = () => {
-                const nextNum = contributions.length + 1;
+                const next = getNextMonthAndYear(contributions);
                 const lastMonth = contributions[contributions.length - 1];
+                const defaultLaura = lastMonth ? lastMonth.laura : 800;
+                const defaultAsier = lastMonth ? lastMonth.asier : 1500;
+                const prevRevolut = contributions.length > 0 ? Number(contributions[contributions.length - 1].revolut) : saldoInicial;
+                const defaultRevolut = Number((prevRevolut + defaultLaura + defaultAsier).toFixed(2));
+                const defaultSimulacion = lastMonth ? lastMonth.simulacion : 1373;
+
+                setNewMonthForm({
+                    month: next.month,
+                    year: next.year,
+                    laura: defaultLaura,
+                    asier: defaultAsier,
+                    revolut: defaultRevolut,
+                    simulacion: defaultSimulacion
+                });
+                setIsNewRevolutManuallyEdited(false);
+                setIsAddingMonth(true);
+            };
+
+            const saveNewMonth = () => {
+                const newMonthName = `${newMonthForm.month} ${newMonthForm.year}`;
+                if (contributions.some(c => c.name.toLowerCase() === newMonthName.toLowerCase())) {
+                    addNotification(`Ya existe un registro para ${newMonthName}`, "error");
+                    return;
+                }
+
                 const newMonth = {
                     id: 'm_' + Date.now(),
-                    name: `Mes ${nextNum}`,
-                    laura: lastMonth ? lastMonth.laura : 800,
-                    asier: lastMonth ? lastMonth.asier : 1500,
-                    revolut: lastMonth ? lastMonth.revolut + (lastMonth.laura + lastMonth.asier) : saldoInicial + 2300,
-                    simulacion: lastMonth ? lastMonth.simulacion : 1373
+                    name: newMonthName,
+                    laura: Number(newMonthForm.laura),
+                    asier: Number(newMonthForm.asier),
+                    revolut: Number(newMonthForm.revolut),
+                    simulacion: Number(newMonthForm.simulacion)
                 };
                 const updated = [...contributions, newMonth];
                 setContributions(updated);
+                setIsAddingMonth(false);
                 persistData(updated);
-                addNotification("Fila de planificación mensual añadida");
+                addNotification("Mes registrado correctamente");
             };
 
             const deleteMonth = (id) => {
                 if (window.confirm("¿Estás seguro de que quieres eliminar este mes del historial?")) {
                     const updated = contributions.filter(c => c.id !== id);
-                    setContributions(updated);
-                    persistData(updated);
-                    addNotification("Mes eliminado del histórico", "info");
+                    if (firebaseStatus === 'connected' && dbRef.current) {
+                        const appIdSlug = firebaseConfig.projectId || 'housecontrol-2bace';
+                        dbRef.current.collection('artifacts').doc(appIdSlug).collection('public').doc('data').collection('contributions').doc(id).delete()
+                            .then(() => {
+                                addNotification("Mes eliminado del histórico", "info");
+                            })
+                            .catch((err) => {
+                                console.error("Error deleting document from Firestore: ", err);
+                                addNotification("Error al eliminar de la nube", "error");
+                            });
+                    } else {
+                        setContributions(updated);
+                        persistData(updated);
+                        addNotification("Mes eliminado del histórico", "info");
+                    }
                 }
             };
 
@@ -1289,29 +1401,183 @@
                                         </button>
                                     </div>
 
-                                    {editingMonth && (
-                                        <div className="bg-slate-900 border border-cyan-500/30 rounded-3xl p-5 space-y-4 shadow-xl">
-                                            <h3 className="font-bold text-cyan-400 flex items-center gap-1.5 text-sm">{SVGIcons.edit} Editar Mes Seleccionado</h3>
-                                            <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                                    {isAddingMonth && (
+                                        <div className="bg-slate-900 border border-emerald-500/30 rounded-3xl p-5 space-y-4 shadow-xl">
+                                            <h3 className="font-bold text-emerald-400 flex items-center gap-1.5 text-sm">{SVGIcons.plus} Registrar Nuevo Mes</h3>
+                                            <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
                                                 <div>
-                                                    <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Nombre</label>
-                                                    <input type="text" className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white text-xs font-bold" value={editForm.name} onChange={e => setEditForm({...editForm, name: e.target.value})} />
+                                                    <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Mes</label>
+                                                    <select 
+                                                        className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white text-xs font-bold focus:border-emerald-500 outline-none" 
+                                                        value={newMonthForm.month} 
+                                                        onChange={e => setNewMonthForm({ ...newMonthForm, month: e.target.value })}
+                                                    >
+                                                        {monthsList.map(m => <option key={m} value={m}>{m}</option>)}
+                                                    </select>
+                                                </div>
+                                                <div>
+                                                    <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Año</label>
+                                                    <select 
+                                                        className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white text-xs font-bold focus:border-emerald-500 outline-none" 
+                                                        value={newMonthForm.year} 
+                                                        onChange={e => setNewMonthForm({ ...newMonthForm, year: e.target.value })}
+                                                    >
+                                                        {Array.from({ length: 12 }, (_, i) => String(2024 + i)).map(y => (
+                                                            <option key={y} value={y}>{y}</option>
+                                                        ))}
+                                                    </select>
                                                 </div>
                                                 <div>
                                                     <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Laura (€)</label>
-                                                    <input type="number" className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white text-xs font-bold" value={editForm.laura} onChange={e => setEditForm({...editForm, laura: Number(e.target.value)})} />
+                                                    <input 
+                                                        type="number" 
+                                                        className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white text-xs font-bold" 
+                                                        value={newMonthForm.laura} 
+                                                        onChange={e => {
+                                                            const val = Number(e.target.value);
+                                                            setNewMonthForm(prev => {
+                                                                const newForm = { ...prev, laura: val };
+                                                                if (!isNewRevolutManuallyEdited) {
+                                                                    const prevRevolut = contributions.length > 0 ? Number(contributions[contributions.length - 1].revolut) : saldoInicial;
+                                                                    newForm.revolut = Number((prevRevolut + val + prev.asier).toFixed(2));
+                                                                }
+                                                                return newForm;
+                                                            });
+                                                        }} 
+                                                    />
                                                 </div>
                                                 <div>
                                                     <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Asier (€)</label>
-                                                    <input type="number" className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white text-xs font-bold" value={editForm.asier} onChange={e => setEditForm({...editForm, asier: Number(e.target.value)})} />
+                                                    <input 
+                                                        type="number" 
+                                                        className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white text-xs font-bold" 
+                                                        value={newMonthForm.asier} 
+                                                        onChange={e => {
+                                                            const val = Number(e.target.value);
+                                                            setNewMonthForm(prev => {
+                                                                const newForm = { ...prev, asier: val };
+                                                                if (!isNewRevolutManuallyEdited) {
+                                                                    const prevRevolut = contributions.length > 0 ? Number(contributions[contributions.length - 1].revolut) : saldoInicial;
+                                                                    newForm.revolut = Number((prevRevolut + prev.laura + val).toFixed(2));
+                                                                }
+                                                                return newForm;
+                                                            });
+                                                        }} 
+                                                    />
                                                 </div>
                                                 <div>
                                                     <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Saldo Revolut (€)</label>
-                                                    <input type="number" className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white text-xs font-bold" value={editForm.revolut} onChange={e => setEditForm({...editForm, revolut: Number(e.target.value)})} />
+                                                    <input 
+                                                        type="number" 
+                                                        className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white text-xs font-bold" 
+                                                        value={newMonthForm.revolut} 
+                                                        onChange={e => {
+                                                            const val = Number(e.target.value);
+                                                            setIsNewRevolutManuallyEdited(true);
+                                                            setNewMonthForm(prev => ({ ...prev, revolut: val }));
+                                                        }} 
+                                                    />
                                                 </div>
                                                 <div className="col-span-2 md:col-span-1">
                                                     <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Plan Simulación (€)</label>
-                                                    <input type="number" className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white text-xs font-bold" value={editForm.simulacion} onChange={e => setEditForm({...editForm, simulacion: Number(e.target.value)})} />
+                                                    <input 
+                                                        type="number" 
+                                                        className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white text-xs font-bold" 
+                                                        value={newMonthForm.simulacion} 
+                                                        onChange={e => setNewMonthForm({ ...newMonthForm, simulacion: Number(e.target.value) })} 
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div className="flex justify-end gap-2">
+                                                <button onClick={() => setIsAddingMonth(false)} className="bg-slate-800 hover:bg-slate-700 text-slate-400 text-xs px-4 py-2 rounded-xl font-bold transition">Cancelar</button>
+                                                <button onClick={saveNewMonth} className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-4 py-2 rounded-xl font-bold transition">Confirmar Datos</button>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {editingMonth && (
+                                        <div className="bg-slate-900 border border-cyan-500/30 rounded-3xl p-5 space-y-4 shadow-xl">
+                                            <h3 className="font-bold text-cyan-400 flex items-center gap-1.5 text-sm">{SVGIcons.edit} Editar Mes Seleccionado</h3>
+                                            <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
+                                                <div>
+                                                    <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Mes</label>
+                                                    <select 
+                                                        className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white text-xs font-bold focus:border-cyan-500 outline-none" 
+                                                        value={editForm.month} 
+                                                        onChange={e => setEditForm({ ...editForm, month: e.target.value })}
+                                                    >
+                                                        {monthsList.map(m => <option key={m} value={m}>{m}</option>)}
+                                                    </select>
+                                                </div>
+                                                <div>
+                                                    <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Año</label>
+                                                    <select 
+                                                        className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white text-xs font-bold focus:border-cyan-500 outline-none" 
+                                                        value={editForm.year} 
+                                                        onChange={e => setEditForm({ ...editForm, year: e.target.value })}
+                                                    >
+                                                        {Array.from({ length: 12 }, (_, i) => String(2024 + i)).map(y => (
+                                                            <option key={y} value={y}>{y}</option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                                <div>
+                                                    <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Laura (€)</label>
+                                                    <input 
+                                                        type="number" 
+                                                        className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white text-xs font-bold" 
+                                                        value={editForm.laura} 
+                                                        onChange={e => {
+                                                            const val = Number(e.target.value);
+                                                            setEditForm(prev => {
+                                                                const newForm = { ...prev, laura: val };
+                                                                if (!isRevolutManuallyEdited) {
+                                                                    newForm.revolut = Number((getPrevRevolutForEdit(editingMonth) + val + prev.asier).toFixed(2));
+                                                                }
+                                                                return newForm;
+                                                            });
+                                                        }} 
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Asier (€)</label>
+                                                    <input 
+                                                        type="number" 
+                                                        className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white text-xs font-bold" 
+                                                        value={editForm.asier} 
+                                                        onChange={e => {
+                                                            const val = Number(e.target.value);
+                                                            setEditForm(prev => {
+                                                                const newForm = { ...prev, asier: val };
+                                                                if (!isRevolutManuallyEdited) {
+                                                                    newForm.revolut = Number((getPrevRevolutForEdit(editingMonth) + prev.laura + val).toFixed(2));
+                                                                }
+                                                                return newForm;
+                                                            });
+                                                        }} 
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Saldo Revolut (€)</label>
+                                                    <input 
+                                                        type="number" 
+                                                        className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white text-xs font-bold" 
+                                                        value={editForm.revolut} 
+                                                        onChange={e => {
+                                                            const val = Number(e.target.value);
+                                                            setIsRevolutManuallyEdited(true);
+                                                            setEditForm(prev => ({ ...prev, revolut: val }));
+                                                        }} 
+                                                    />
+                                                </div>
+                                                <div className="col-span-2 md:col-span-1">
+                                                    <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Plan Simulación (€)</label>
+                                                    <input 
+                                                        type="number" 
+                                                        className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white text-xs font-bold" 
+                                                        value={editForm.simulacion} 
+                                                        onChange={e => setEditForm({ ...editForm, simulacion: Number(e.target.value) })} 
+                                                    />
                                                 </div>
                                             </div>
                                             <div className="flex justify-end gap-2">
