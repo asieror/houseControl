@@ -2203,9 +2203,19 @@
         function ResponsiveSVGChart({ rows, metaTotal }) {
             if (!rows || rows.length === 0) return null;
 
-            const width = 600;
-            const height = 180;
-            const padding = 30;
+            const [isMobile, setIsMobile] = React.useState(window.innerWidth < 768);
+
+            React.useEffect(() => {
+                const handleResize = () => {
+                    setIsMobile(window.innerWidth < 768);
+                };
+                window.addEventListener('resize', handleResize);
+                return () => window.removeEventListener('resize', handleResize);
+            }, []);
+
+            const width = isMobile ? 400 : 600;
+            const height = isMobile ? 220 : 180;
+            const padding = isMobile ? 35 : 30;
 
             const maxVal = Math.max(...rows.map(r => Math.max(r.acumulado, r.simulacionAcumulado, metaTotal))) * 1.1;
             const minVal = 0;
@@ -2242,7 +2252,7 @@
                             return (
                                 <g key={idx}>
                                     <line x1={padding} y1={y} x2={width - padding} y2={y} stroke="rgba(51, 65, 85, 0.15)" strokeWidth="1" />
-                                    <text x={padding - 5} y={y + 3} fill="#475569" fontSize="8" fontWeight="bold" textAnchor="end">
+                                    <text x={padding - 5} y={y + 3} fill="#475569" fontSize={isMobile ? "9" : "8"} fontWeight="bold" textAnchor="end">
                                         {valLabel.toLocaleString('es-ES')}
                                     </text>
                                 </g>
@@ -2250,19 +2260,19 @@
                         })}
 
                         <path d={areaRealD} fill="url(#realGradient)" opacity="0.12" />
-                        <path d={pathSimD} fill="none" stroke="#6366f1" strokeWidth="2" strokeDasharray="3,3" />
-                        <path d={pathRealD} fill="none" stroke="#0ea5e9" strokeWidth="3" strokeLinecap="round" />
+                        <path d={pathSimD} fill="none" stroke="#6366f1" strokeWidth={isMobile ? "2.5" : "2"} strokeDasharray="3,3" />
+                        <path d={pathRealD} fill="none" stroke="#0ea5e9" strokeWidth={isMobile ? "4" : "3"} strokeLinecap="round" />
 
                         {pointsReal.map((p, i) => (
                             <g key={i} className="group cursor-pointer">
-                                <circle cx={p.x} cy={p.y} r="3.5" fill="#0ea5e9" stroke="#0f172a" strokeWidth="1.5" />
+                                <circle cx={p.x} cy={p.y} r={isMobile ? "4.5" : "3.5"} fill="#0ea5e9" stroke="#0f172a" strokeWidth="1.5" />
                                 <circle cx={p.x} cy={p.y} r="8" fill="transparent" />
                                 <title>{`${p.name}: ${Math.round(p.val).toLocaleString('es-ES')} €`}</title>
                             </g>
                         ))}
 
                         {pointsReal.filter((_, idx) => idx % 2 === 0).map((p, idx) => (
-                            <text key={idx} x={p.x} y={height - 8} fill="#64748b" fontSize="8" fontWeight="bold" textAnchor="middle">
+                            <text key={idx} x={p.x} y={height - (isMobile ? 12 : 8)} fill="#64748b" fontSize={isMobile ? "9" : "8"} fontWeight="bold" textAnchor="middle">
                                 {p.name.split(' ')[0]}
                             </text>
                         ))}
