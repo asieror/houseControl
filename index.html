@@ -201,6 +201,7 @@
             const [lauraInitialPayment, setLauraInitialPayment] = useState(33000);
             const [asierInitialPayment, setAsierInitialPayment] = useState(10000);
             const [repaidToLaura, setRepaidToLaura] = useState(0);
+            const [balanceMode, setBalanceMode] = useState('direct'); // 'direct' | 'common'
 
             const [user, setUser] = useState(null);
             const [userEmail, setUserEmail] = useState("");
@@ -1313,7 +1314,7 @@
                                     </div>
 
                                     <div className="bg-slate-900/40 p-6 rounded-3xl border border-slate-800 space-y-6 animate-fadeIn">
-                                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800/60 pb-5">
                                             <div>
                                                 <h3 className="text-base font-extrabold text-white flex items-center gap-2">
                                                     <span className="text-indigo-400">{SVGIcons.scale}</span>
@@ -1322,45 +1323,88 @@
                                                 <p className="text-xs text-slate-400">Consolidación de aportaciones (Inicial + Mensual) para garantizar el reparto al 50%</p>
                                             </div>
 
-                                            {processedData.balanceConsolidado === 0 ? (
-                                                <span className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-bold px-3 py-1.5 rounded-full flex items-center gap-1">
-                                                    <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full"></span> Balance Perfecto
-                                                </span>
-                                            ) : (
-                                                <span className="bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs font-bold px-3 py-1.5 rounded-full flex items-center gap-1">
-                                                    <span className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-pulse"></span> Ajuste Pendiente
-                                                </span>
-                                            )}
+                                            <div className="bg-slate-950/80 p-1.5 rounded-2xl flex gap-1 border border-slate-800/60 shrink-0 w-full sm:w-auto">
+                                                <button
+                                                    onClick={() => setBalanceMode('direct')}
+                                                    className={`flex-1 sm:flex-initial text-center px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-305 ${balanceMode === 'direct' ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/40'}`}
+                                                >
+                                                    Opción A: Bizum / Pago Directo
+                                                </button>
+                                                <button
+                                                    onClick={() => setBalanceMode('common')}
+                                                    className={`flex-1 sm:flex-initial text-center px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all duration-305 ${balanceMode === 'common' ? 'bg-cyan-600 text-white shadow-lg' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/40'}`}
+                                                >
+                                                    Opción B: Bote Común (Revolut)
+                                                </button>
+                                            </div>
                                         </div>
 
-                                        {/* TARJETA DE ESTADO: BALANCE NETO GLOBAL */}
-                                        <div className="bg-slate-950/80 p-6 rounded-2xl border border-slate-800/80 relative overflow-hidden group">
-                                            <div className={`absolute right-0 bottom-0 translate-x-4 translate-y-4 w-28 h-28 rounded-full opacity-5 transition-transform duration-500 ${processedData.balanceConsolidado > 0 ? 'bg-pink-500' : processedData.balanceConsolidado < 0 ? 'bg-blue-500' : 'bg-emerald-500'}`}></div>
-                                            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                                                <div className="space-y-1">
-                                                    <span className="text-[10px] uppercase font-black tracking-widest text-slate-400">Estado de Liquidación Actual</span>
-                                                    {processedData.balanceConsolidado === 0 ? (
-                                                        <h4 className="text-xl font-black text-emerald-400">¡Cuentas al día!</h4>
-                                                    ) : processedData.balanceConsolidado > 0 ? (
-                                                        <h4 className="text-xl font-black text-pink-400">Asier debe compensar a Laura</h4>
-                                                    ) : (
-                                                        <h4 className="text-xl font-black text-blue-400">Laura debe compensar a Asier</h4>
-                                                    )}
-                                                    <p className="text-slate-400 text-[11px] leading-relaxed max-w-xl">
-                                                        Este balance se calcula sumando el desequilibrio inicial, restando lo devuelto en efectivo y sumando la diferencia mensual.
-                                                        <span className="block mt-1 text-slate-500 font-semibold">
-                                                            💡 <strong>Nota matemática:</strong> Para equilibrar cuentas mediante una transferencia directa, el pago es siempre la <strong>mitad de la diferencia</strong>. Si Laura ha aportado 20 € más, Asier solo le transfiere 10 € a ella (así Laura tiene 20 € netos y Asier 20 € netos, quedando iguales).
-                                                        </span>
-                                                    </p>
-                                                </div>
-                                                <div className={`p-4 rounded-xl border flex flex-col items-center shrink-0 w-full md:w-auto text-center ${processedData.balanceConsolidado > 0 ? 'bg-pink-500/5 border-pink-500/20 text-pink-400' : processedData.balanceConsolidado < 0 ? 'bg-blue-500/5 border-blue-500/20 text-blue-400' : 'bg-emerald-500/5 border-emerald-500/20 text-emerald-400'}`}>
-                                                    <span className="text-[10px] uppercase font-black tracking-widest block opacity-75">Compensación Neta</span>
-                                                    <strong className="text-2xl font-black block tracking-tight mt-0.5">
-                                                        {Math.abs(processedData.balanceConsolidado).toLocaleString('es-ES', { minimumFractionDigits: 2 })} €
-                                                    </strong>
-                                                    <span className="text-[9px] font-semibold mt-1 opacity-90">
-                                                        {processedData.balanceConsolidado === 0 ? "Aportación equitativa" : `Para balance perfecto (50%)`}
-                                                    </span>
+                                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                                            {/* Columna Izquierda: Gráfico interactivo (Donut) */}
+                                            <div className="lg:col-span-1 h-full">
+                                                <BalanceDonutChart 
+                                                    lauraValue={processedData.totalLauraNeto} 
+                                                    asierValue={processedData.totalAsierNeto} 
+                                                    nameLaura="Laura"
+                                                    nameAsier="Asier"
+                                                />
+                                            </div>
+
+                                            {/* Columna Derecha: Tarjetas de Estado y Explicación */}
+                                            <div className="lg:col-span-2 space-y-4 flex flex-col justify-between">
+                                                <div className="bg-slate-950/80 p-6 rounded-3xl border border-slate-800/80 relative overflow-hidden group flex-1 flex flex-col justify-center">
+                                                    <div className={`absolute right-0 bottom-0 translate-x-4 translate-y-4 w-28 h-28 rounded-full opacity-5 transition-transform duration-500 ${balanceMode === 'direct' ? 'bg-indigo-500' : 'bg-cyan-500'}`}></div>
+                                                    
+                                                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                                                        <div className="space-y-2">
+                                                            <span className="text-[10px] uppercase font-black tracking-widest text-slate-500">
+                                                                {balanceMode === 'direct' ? "Modo Bizum / Compensación Directa" : "Modo Bote Común / Cuenta Revolut"}
+                                                            </span>
+                                                            {processedData.balanceConsolidado === 0 ? (
+                                                                <h4 className="text-xl font-black text-emerald-400">¡Cuentas al día!</h4>
+                                                            ) : balanceMode === 'direct' ? (
+                                                                processedData.balanceConsolidado > 0 ? (
+                                                                    <h4 className="text-xl font-black text-pink-400">Asier debe compensar a Laura</h4>
+                                                                ) : (
+                                                                    <h4 className="text-xl font-black text-blue-400">Laura debe compensar a Asier</h4>
+                                                                )
+                                                            ) : (
+                                                                processedData.diferenciaNetaGlobal > 0 ? (
+                                                                    <h4 className="text-xl font-black text-pink-400">Asier debe ingresar más en Revolut</h4>
+                                                                ) : (
+                                                                    <h4 className="text-xl font-black text-blue-400">Laura debe ingresar más en Revolut</h4>
+                                                                )
+                                                            )}
+                                                            <p className="text-slate-450 text-[11px] leading-relaxed max-w-xl">
+                                                                {balanceMode === 'direct' ? (
+                                                                    <span>
+                                                                        Este balance asume una transferencia privada entre vosotros para quedar 50/50. 
+                                                                        Al ser un pago directo, se transfiere la <strong>mitad de la diferencia</strong> de vuestras aportaciones netas acumuladas.
+                                                                    </span>
+                                                                ) : (
+                                                                    <span>
+                                                                        Este balance asume que la cuenta conjunta Revolut se equilibrará haciendo que el que ha aportado menos realice un ingreso extra. 
+                                                                        Al ingresar dinero al fondo común, se deposita la <strong>diferencia neta completa</strong>.
+                                                                    </span>
+                                                                )}
+                                                            </p>
+                                                        </div>
+
+                                                        <div className={`p-4 rounded-2xl border flex flex-col items-center shrink-0 w-full sm:w-auto text-center ${balanceMode === 'direct' ? 'bg-indigo-500/5 border-indigo-500/20 text-indigo-400' : 'bg-cyan-500/5 border-cyan-500/20 text-cyan-400'}`}>
+                                                            <span className="text-[10px] uppercase font-black tracking-widest block opacity-75">
+                                                                {balanceMode === 'direct' ? "Pago Compensatorio" : "Ingreso Requerido"}
+                                                            </span>
+                                                            <strong className="text-2xl font-black block tracking-tight mt-0.5">
+                                                                {balanceMode === 'direct' 
+                                                                    ? `${Math.abs(processedData.balanceConsolidado).toLocaleString('es-ES', { minimumFractionDigits: 2 })} €`
+                                                                    : `${Math.abs(processedData.diferenciaNetaGlobal).toLocaleString('es-ES', { minimumFractionDigits: 2 })} €`
+                                                                }
+                                                            </strong>
+                                                            <span className="text-[8px] font-bold mt-1 opacity-90 uppercase tracking-wider">
+                                                                {processedData.balanceConsolidado === 0 ? "Aportación equitativa" : balanceMode === 'direct' ? "Para igualar netos" : "Para igualar en bote"}
+                                                            </span>
+                                                        </div>
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
@@ -1375,7 +1419,7 @@
                                                         <th className="p-4 text-right text-blue-400">Asier Aportó</th>
                                                         <th className="p-4 text-right text-white">Total Proyecto</th>
                                                         <th className="p-4 text-right text-slate-300">Diferencia</th>
-                                                        <th className="p-4 text-right text-indigo-400">Ajuste 50/50</th>
+                                                        <th className="p-4 text-right text-indigo-400">Ajuste 50/50 ({balanceMode === 'direct' ? 'Bizum' : 'Revolut'})</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody className="divide-y divide-slate-850">
@@ -1392,7 +1436,11 @@
                                                             {processedData.diferenciaInicial > 0 ? `+${processedData.diferenciaInicial.toLocaleString('es-ES')} € Laura` : processedData.diferenciaInicial < 0 ? `+${Math.abs(processedData.diferenciaInicial).toLocaleString('es-ES')} € Asier` : 'Sin diferencia'}
                                                         </td>
                                                         <td className="p-4 text-right font-bold text-indigo-300">
-                                                            {processedData.compensacionInicialIdeal > 0 ? `Asier debe ${processedData.compensacionInicialIdeal.toLocaleString('es-ES')} €` : processedData.compensacionInicialIdeal < 0 ? `Laura debe ${Math.abs(processedData.compensacionInicialIdeal).toLocaleString('es-ES')} €` : '0 €'}
+                                                            {balanceMode === 'direct' ? (
+                                                                processedData.compensacionInicialIdeal > 0 ? `Asier debe ${processedData.compensacionInicialIdeal.toLocaleString('es-ES')} €` : processedData.compensacionInicialIdeal < 0 ? `Laura debe ${Math.abs(processedData.compensacionInicialIdeal).toLocaleString('es-ES')} €` : '0 €'
+                                                            ) : (
+                                                                processedData.diferenciaInicial > 0 ? `Asier ingresa ${processedData.diferenciaInicial.toLocaleString('es-ES')} €` : processedData.diferenciaInicial < 0 ? `Laura ingresa ${Math.abs(processedData.diferenciaInicial).toLocaleString('es-ES')} €` : '0 €'
+                                                            )}
                                                         </td>
                                                     </tr>
 
@@ -1409,7 +1457,10 @@
                                                             -{ (repaidToLaura * 2).toLocaleString('es-ES') } € diferencia
                                                         </td>
                                                         <td className="p-4 text-right font-bold text-emerald-400">
-                                                            -{repaidToLaura.toLocaleString('es-ES')} € pendiente
+                                                            {balanceMode === 'direct' 
+                                                                ? `-${repaidToLaura.toLocaleString('es-ES')} € pendiente` 
+                                                                : `-${(repaidToLaura * 2).toLocaleString('es-ES')} € diferencia`
+                                                            }
                                                         </td>
                                                     </tr>
 
@@ -1426,7 +1477,11 @@
                                                             {processedData.diferenciaMensual > 0 ? `+${processedData.diferenciaMensual.toLocaleString('es-ES')} € Laura` : processedData.diferenciaMensual < 0 ? `+${Math.abs(processedData.diferenciaMensual).toLocaleString('es-ES')} € Asier` : 'Sin diferencia'}
                                                         </td>
                                                         <td className="p-4 text-right font-bold text-indigo-300">
-                                                            {processedData.compensacionMensualIdeal > 0 ? `Asier debe ${processedData.compensacionMensualIdeal.toLocaleString('es-ES')} €` : processedData.compensacionMensualIdeal < 0 ? `Laura debe ${Math.abs(processedData.compensacionMensualIdeal).toLocaleString('es-ES')} €` : '0 €'}
+                                                            {balanceMode === 'direct' ? (
+                                                                processedData.compensacionMensualIdeal > 0 ? `Asier debe ${processedData.compensacionMensualIdeal.toLocaleString('es-ES')} €` : processedData.compensacionMensualIdeal < 0 ? `Laura debe ${Math.abs(processedData.compensacionMensualIdeal).toLocaleString('es-ES')} €` : '0 €'
+                                                            ) : (
+                                                                processedData.diferenciaMensual > 0 ? `Asier ingresa ${processedData.diferenciaMensual.toLocaleString('es-ES')} €` : processedData.diferenciaMensual < 0 ? `Laura ingresa ${Math.abs(processedData.diferenciaMensual).toLocaleString('es-ES')} €` : '0 €'
+                                                            )}
                                                         </td>
                                                     </tr>
 
@@ -1440,12 +1495,22 @@
                                                             {processedData.diferenciaNetaGlobal > 0 ? `+${processedData.diferenciaNetaGlobal.toLocaleString('es-ES')} € Laura` : processedData.diferenciaNetaGlobal < 0 ? `+${Math.abs(processedData.diferenciaNetaGlobal).toLocaleString('es-ES')} € Asier` : 'Equilibrado'}
                                                         </td>
                                                         <td className="p-4 text-right text-[13px] text-indigo-400">
-                                                            {processedData.balanceConsolidado > 0 ? (
-                                                                <span className="text-pink-300">Asier paga {processedData.balanceConsolidado.toLocaleString('es-ES')} €</span>
-                                                            ) : processedData.balanceConsolidado < 0 ? (
-                                                                <span className="text-blue-300">Laura paga {Math.abs(processedData.balanceConsolidado).toLocaleString('es-ES')} €</span>
+                                                            {balanceMode === 'direct' ? (
+                                                                processedData.balanceConsolidado > 0 ? (
+                                                                    <span className="text-pink-300">Asier paga {processedData.balanceConsolidado.toLocaleString('es-ES')} €</span>
+                                                                ) : processedData.balanceConsolidado < 0 ? (
+                                                                    <span className="text-blue-300">Laura paga {Math.abs(processedData.balanceConsolidado).toLocaleString('es-ES')} €</span>
+                                                                ) : (
+                                                                    <span className="text-emerald-400">Equilibrado al 50%</span>
+                                                                )
                                                             ) : (
-                                                                <span className="text-emerald-400">Equilibrado al 50%</span>
+                                                                processedData.diferenciaNetaGlobal > 0 ? (
+                                                                    <span className="text-pink-300">Asier ingresa {processedData.diferenciaNetaGlobal.toLocaleString('es-ES')} €</span>
+                                                                ) : processedData.diferenciaNetaGlobal < 0 ? (
+                                                                    <span className="text-blue-300">Laura ingresa {Math.abs(processedData.diferenciaNetaGlobal).toLocaleString('es-ES')} €</span>
+                                                                ) : (
+                                                                    <span className="text-emerald-400">Equilibrado en cuenta</span>
+                                                                )
                                                             )}
                                                         </td>
                                                     </tr>
@@ -2202,6 +2267,152 @@
                             </text>
                         ))}
                     </svg>
+                </div>
+            );
+        }
+
+        function BalanceDonutChart({ lauraValue, asierValue, nameLaura = "Laura", nameAsier = "Asier" }) {
+            const [chartState, setChartState] = React.useState('current'); // 'current' | 'balanced'
+            const [hoveredSlice, setHoveredSlice] = React.useState(null); // 'laura' | 'asier' | null
+
+            const isBalanced = chartState === 'balanced';
+            
+            // Values to draw
+            const total = lauraValue + asierValue;
+            const drawLaura = isBalanced ? total / 2 : lauraValue;
+            const drawAsier = isBalanced ? total / 2 : asierValue;
+            
+            const pctLaura = total > 0 ? (drawLaura / total) * 100 : 50;
+            const pctAsier = total > 0 ? (drawAsier / total) * 100 : 50;
+
+            const size = 180;
+            const center = size / 2;
+            const radius = 62;
+            const strokeWidth = 14;
+            const circumference = 2 * Math.PI * radius;
+
+            const strokeDashoffsetLaura = circumference - (pctLaura / 100) * circumference;
+            const rotateLaura = -90; // Start at the top (12 o'clock)
+            const rotateAsier = -90 + (pctLaura / 100) * 360;
+
+            // Labels to display in the middle of donut
+            let activeLabel = "Aportado Neto";
+            let activeValue = `${total.toLocaleString('es-ES')} €`;
+            if (isBalanced) {
+                activeLabel = "Estado Equilibrado";
+                activeValue = `${(total / 2).toLocaleString('es-ES')} € c/u`;
+                if (hoveredSlice === 'laura') {
+                    activeLabel = `${nameLaura} (Ideal)`;
+                } else if (hoveredSlice === 'asier') {
+                    activeLabel = `${nameAsier} (Ideal)`;
+                }
+            } else {
+                if (hoveredSlice === 'laura') {
+                    activeLabel = `${nameLaura}: ${((lauraValue / (total || 1)) * 100).toFixed(1)}%`;
+                    activeValue = `${lauraValue.toLocaleString('es-ES')} €`;
+                } else if (hoveredSlice === 'asier') {
+                    activeLabel = `${nameAsier}: ${((asierValue / (total || 1)) * 100).toFixed(1)}%`;
+                    activeValue = `${asierValue.toLocaleString('es-ES')} €`;
+                }
+            }
+
+            return (
+                <div className="flex flex-col items-center justify-center p-5 bg-slate-950/60 rounded-3xl border border-slate-800/80 shadow-xl space-y-4 h-full relative overflow-hidden group">
+                    <div className="flex justify-between items-center w-full">
+                        <span className="text-[10px] uppercase font-black tracking-wider text-slate-400">Distribución Real</span>
+                        <div className="bg-slate-900 p-0.5 rounded-lg flex border border-slate-800">
+                            <button
+                                onClick={() => setChartState('current')}
+                                className={`px-2 py-1 rounded text-[8px] font-black uppercase tracking-wider transition ${chartState === 'current' ? 'bg-indigo-600 text-white' : 'text-slate-500 hover:text-slate-350'}`}
+                            >
+                                Actual
+                            </button>
+                            <button
+                                onClick={() => setChartState('balanced')}
+                                className={`px-2 py-1 rounded text-[8px] font-black uppercase tracking-wider transition ${chartState === 'balanced' ? 'bg-indigo-600 text-white' : 'text-slate-500 hover:text-slate-350'}`}
+                            >
+                                Ideal
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className="relative w-40 h-40 flex items-center justify-center">
+                        <svg width="100%" height="100%" viewBox={`0 0 ${size} ${size}`} className="transform -rotate-90">
+                            {/* Background track */}
+                            <circle
+                                cx={center}
+                                cy={center}
+                                r={radius}
+                                fill="transparent"
+                                stroke="#1e293b"
+                                strokeWidth={strokeWidth}
+                            />
+                            {/* Laura's slice (Pink) */}
+                            <circle
+                                cx={center}
+                                cy={center}
+                                r={radius}
+                                fill="transparent"
+                                stroke="#ec4899"
+                                strokeWidth={hoveredSlice === 'laura' ? strokeWidth + 3 : strokeWidth}
+                                strokeDasharray={circumference}
+                                strokeDashoffset={strokeDashoffsetLaura}
+                                strokeLinecap="round"
+                                transform={`rotate(${rotateLaura} ${center} ${center})`}
+                                className="transition-all duration-500 cursor-pointer origin-center hover:scale-102"
+                                onMouseEnter={() => setHoveredSlice('laura')}
+                                onMouseLeave={() => setHoveredSlice(null)}
+                            />
+                            {/* Asier's slice (Blue) */}
+                            <circle
+                                cx={center}
+                                cy={center}
+                                r={radius}
+                                fill="transparent"
+                                stroke="#3b82f6"
+                                strokeWidth={hoveredSlice === 'asier' ? strokeWidth + 3 : strokeWidth}
+                                strokeDasharray={circumference}
+                                strokeDashoffset={circumference - (pctAsier / 100) * circumference}
+                                strokeLinecap="round"
+                                transform={`rotate(${rotateAsier} ${center} ${center})`}
+                                className="transition-all duration-500 cursor-pointer origin-center hover:scale-102"
+                                onMouseEnter={() => setHoveredSlice('asier')}
+                                onMouseLeave={() => setHoveredSlice(null)}
+                            />
+                        </svg>
+
+                        {/* Text center */}
+                        <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none select-none">
+                            <span className="text-[8px] uppercase font-black text-slate-500 tracking-widest leading-none mb-1.5">
+                                {activeLabel}
+                            </span>
+                            <span className="text-base font-black text-white leading-none tracking-tight">
+                                {activeValue}
+                            </span>
+                            <span className="text-[7px] text-slate-500 font-bold mt-1 opacity-70">
+                                {isBalanced ? "Equilibrio (50/50)" : hoveredSlice ? "Detalle" : "Pasa el cursor"}
+                            </span>
+                        </div>
+                    </div>
+
+                    <div className="w-full flex justify-around text-[9px] font-bold border-t border-slate-900 pt-3">
+                        <div className="flex flex-col items-center">
+                            <span className="flex items-center gap-1 text-pink-400">
+                                <span className="w-1.5 h-1.5 rounded-full bg-pink-500"></span>
+                                {nameLaura}
+                            </span>
+                            <span className="text-white mt-0.5">{lauraValue.toLocaleString('es-ES')} €</span>
+                            <span className="text-[8px] text-slate-500 font-semibold">{((lauraValue / (total || 1)) * 100).toFixed(0)}% real</span>
+                        </div>
+                        <div className="flex flex-col items-center">
+                            <span className="flex items-center gap-1 text-blue-400">
+                                <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+                                {nameAsier}
+                            </span>
+                            <span className="text-white mt-0.5">{asierValue.toLocaleString('es-ES')} €</span>
+                            <span className="text-[8px] text-slate-500 font-semibold">{((asierValue / (total || 1)) * 100).toFixed(0)}% real</span>
+                        </div>
+                    </div>
                 </div>
             );
         }
