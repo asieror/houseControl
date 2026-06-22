@@ -685,10 +685,22 @@
                 const totalMueblesPresupuesto = furnitureBudget.reduce((sum, item) => sum + item.amount, 0);
                 const totalMueblesGastado = furnitureBudget.reduce((sum, item) => sum + item.spent, 0);
 
-                const deudaInicialAsierALaura = (lauraInitialPayment - asierInitialPayment) / 2;
-                const deudaInicialPendiente = Math.max(0, deudaInicialAsierALaura - repaidToLaura);
-                const deudaMensualAsierALaura = (totalLaura - totalAsier) / 2;
-                const balanceConsolidadoAsierALaura = deudaInicialPendiente + deudaMensualAsierALaura;
+                // --- NUEVA LÓGICA DE BALANCE Ledger 50/50 ---
+                const totalInicial = lauraInitialPayment + asierInitialPayment;
+                const diferenciaInicial = lauraInitialPayment - asierInitialPayment;
+                const compensacionInicialIdeal = diferenciaInicial / 2;
+                const balanceInicialPendiente = compensacionInicialIdeal - repaidToLaura;
+
+                const totalMensual = totalLaura + totalAsier;
+                const diferenciaMensual = totalLaura - totalAsier;
+                const compensacionMensualIdeal = diferenciaMensual / 2;
+
+                const totalLauraNeto = lauraInitialPayment + totalLaura - repaidToLaura;
+                const totalAsierNeto = asierInitialPayment + totalAsier + repaidToLaura;
+                const totalGeneralProyecto = totalInicial + totalMensual;
+                const objetivoPorPersona = totalGeneralProyecto / 2;
+                const diferenciaNetaGlobal = totalLauraNeto - totalAsierNeto;
+                const balanceConsolidado = totalLauraNeto - objetivoPorPersona; // Si > 0, Asier debe a Laura; si < 0, Laura debe a Asier
 
                 return {
                     rows,
@@ -701,10 +713,20 @@
                     totalSimulacion,
                     totalMueblesPresupuesto,
                     totalMueblesGastado,
-                    deudaInicialAsierALaura,
-                    deudaInicialPendiente,
-                    deudaMensualAsierALaura,
-                    balanceConsolidadoAsierALaura
+                    // Variables expuestas para la UI
+                    totalInicial,
+                    diferenciaInicial,
+                    compensacionInicialIdeal,
+                    balanceInicialPendiente,
+                    totalMensual,
+                    diferenciaMensual,
+                    compensacionMensualIdeal,
+                    totalLauraNeto,
+                    totalAsierNeto,
+                    totalGeneralProyecto,
+                    objetivoPorPersona,
+                    diferenciaNetaGlobal,
+                    balanceConsolidado
                 };
             }, [contributions, metaTotal, saldoInicial, furnitureBudget, revolutCorrection, lauraInitialPayment, asierInitialPayment, repaidToLaura]);
 
@@ -1290,113 +1312,168 @@
                                         </div>
                                     </div>
 
-                                    <div className="bg-slate-900/40 p-6 rounded-3xl border border-slate-800 space-y-6">
+                                    <div className="bg-slate-900/40 p-6 rounded-3xl border border-slate-800 space-y-6 animate-fadeIn">
                                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                                             <div>
                                                 <h3 className="text-base font-extrabold text-white flex items-center gap-2">
                                                     <span className="text-indigo-400">{SVGIcons.scale}</span>
-                                                    Acuerdo de Co-Inversión al 50/50 (Especial Entrada)
+                                                    Balance General de Co-Inversión al 50/50
                                                 </h3>
-                                                <p className="text-xs text-slate-400">Control estricto para que vuestras aportaciones estén siempre equilibradas</p>
+                                                <p className="text-xs text-slate-400">Consolidación de aportaciones (Inicial + Mensual) para garantizar el reparto al 50%</p>
                                             </div>
 
-                                            {processedData.balanceConsolidadoAsierALaura === 0 ? (
-                                                <span className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-bold px-3 py-1.5 rounded-full">Balance Perfecto</span>
+                                            {processedData.balanceConsolidado === 0 ? (
+                                                <span className="bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-bold px-3 py-1.5 rounded-full flex items-center gap-1">
+                                                    <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full"></span> Balance Perfecto
+                                                </span>
                                             ) : (
-                                                <span className="bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs font-bold px-3 py-1.5 rounded-full">
-                                                    Compensación Requerida
+                                                <span className="bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs font-bold px-3 py-1.5 rounded-full flex items-center gap-1">
+                                                    <span className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-pulse"></span> Ajuste Pendiente
                                                 </span>
                                             )}
                                         </div>
 
-                                        <div className="bg-slate-950/80 p-5 rounded-2xl border border-slate-800/80 space-y-4">
-                                            <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
-                                                <span className="w-2 h-2 rounded-full bg-amber-400"></span> Ajuste de Entrada del primer 10%
-                                            </h4>
-                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
-                                                <div className="bg-slate-900/40 p-3.5 rounded-xl border border-slate-800">
-                                                    <span className="text-slate-400 font-bold block mb-1"> Laura aportó:</span>
-                                                    <strong className="text-lg font-black text-white">{lauraInitialPayment.toLocaleString('es-ES')} €</strong>
-                                                </div>
-                                                <div className="bg-slate-900/40 p-3.5 rounded-xl border border-slate-800">
-                                                    <span className="text-slate-400 font-bold block mb-1"> Asier aportó:</span>
-                                                    <strong className="text-lg font-black text-white">{asierInitialPayment.toLocaleString('es-ES')} €</strong>
-                                                </div>
-                                                <div className="bg-slate-900/40 p-3.5 rounded-xl border border-slate-800">
-                                                    <span className="text-slate-400 font-bold block mb-1"> Compensación Ideal:</span>
-                                                    <span className="block text-[10px] text-slate-500">Asier debe devolver originalmente a Laura:</span>
-                                                    <strong className="text-lg font-black text-amber-400">{processedData.deudaInicialAsierALaura.toLocaleString('es-ES')} €</strong>
-                                                </div>
-                                            </div>
-
-                                            <div className="p-4 bg-slate-900/60 rounded-xl border border-slate-850 flex flex-col md:flex-row items-center justify-between gap-4">
+                                        {/* TARJETA DE ESTADO: BALANCE NETO GLOBAL */}
+                                        <div className="bg-slate-950/80 p-6 rounded-2xl border border-slate-800/80 relative overflow-hidden group">
+                                            <div className={`absolute right-0 bottom-0 translate-x-4 translate-y-4 w-28 h-28 rounded-full opacity-5 transition-transform duration-500 ${processedData.balanceConsolidado > 0 ? 'bg-pink-500' : processedData.balanceConsolidado < 0 ? 'bg-blue-500' : 'bg-emerald-500'}`}></div>
+                                            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                                                 <div className="space-y-1">
-                                                    <span className="text-slate-300 font-extrabold text-xs block">¿Cuánto ha devuelto Asier a Laura poco a poco?</span>
-                                                    <p className="text-[10px] text-slate-500">Registra aquí la suma total que Asier le ha reembolsado ya a Laura de la asimetría inicial.</p>
-                                                </div>
-                                                <div className="flex items-center gap-2 w-full md:w-auto shrink-0">
-                                                    <input 
-                                                        type="text" 
-                                                        className="bg-slate-950 border border-slate-800 rounded-lg p-2 text-xs font-black text-white w-24 text-center focus:outline-none" 
-                                                        value={tempRepaidAmount}
-                                                        onChange={e => setTempRepaidAmount(e.target.value)}
-                                                    />
-                                                    <button onClick={saveRepaidAmount} className="bg-cyan-600 hover:bg-cyan-500 text-white text-[10px] font-black uppercase px-3 py-2 rounded-lg transition shrink-0 flex items-center gap-1">
-                                                        {SVGIcons.save} Actualizar
-                                                    </button>
-                                                </div>
-                                            </div>
-
-                                            <div className="flex justify-between items-center text-xs font-bold pt-1">
-                                                <span className="text-slate-400">Deuda por el pago del primer 10% pendiente de amortizar:</span>
-                                                <strong className="text-white bg-slate-900 px-3 py-1.5 rounded-lg border border-slate-800">
-                                                    {processedData.deudaInicialPendiente.toLocaleString('es-ES')} €
-                                                </strong>
-                                            </div>
-                                        </div>
-
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                            <div className="bg-slate-900/60 p-5 rounded-2xl border border-slate-800 relative">
-                                                <span className="absolute top-4 right-4 text-xs font-black text-pink-400 bg-pink-500/10 px-2 py-0.5 rounded-md">Laura</span>
-                                                <span className="text-xs font-bold text-slate-400">Ahorro Mensual Acumulado</span>
-                                                <div className="text-2xl font-black text-white mt-1">{processedData.totalLaura.toLocaleString('es-ES')} €</div>
-                                                <div className="mt-4 flex justify-between text-xs text-slate-400">
-                                                    <span>Nóminas en Revolut: {((processedData.totalLaura / (processedData.totalLaura + processedData.totalAsier || 1)) * 100).toFixed(1)}%</span>
-                                                </div>
-                                            </div>
-
-                                            <div className="bg-slate-900/60 p-5 rounded-2xl border border-slate-800 relative">
-                                                <span className="absolute top-4 right-4 text-xs font-black text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded-md">Asier</span>
-                                                <span className="text-xs font-bold text-slate-400">Ahorro Mensual Acumulado</span>
-                                                <div className="text-2xl font-black text-white mt-1">{processedData.totalAsier.toLocaleString('es-ES')} €</div>
-                                                <div className="mt-4 flex justify-between text-xs text-slate-400">
-                                                    <span>Nóminas en Revolut: {((processedData.totalAsier / (processedData.totalLaura + processedData.totalAsier || 1)) * 100).toFixed(1)}%</span>
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        {processedData.balanceConsolidadoAsierALaura !== 0 && (
-                                            <div className="bg-indigo-500/5 border border-indigo-500/15 p-5 rounded-2xl space-y-3 text-xs">
-                                                <div className="flex items-center gap-3.5">
-                                                    <span className="p-2 bg-indigo-500/10 text-indigo-400 rounded-lg shrink-0">{SVGIcons.scale}</span>
-                                                    <div>
-                                                        <h4 className="font-extrabold text-white">Balance Neto Consolidado</h4>
-                                                        <p className="text-slate-400 text-[10px]">Cálculo integrado sumando el desequilibrio mensual y la deuda pendiente de la primera entrada.</p>
-                                                    </div>
-                                                </div>
-                                                <div className="bg-slate-950 p-4 rounded-xl border border-slate-900 leading-relaxed text-slate-300">
-                                                    {processedData.balanceConsolidadoAsierALaura > 0 ? (
-                                                        <p>
-                                                            Teniendo en cuenta el historial mensual y la diferencia del pago del primer hito, <strong className="text-indigo-400">Asier debe compensar un total neto de <span className="text-sm font-black text-indigo-300">{processedData.balanceConsolidadoAsierALaura.toLocaleString('es-ES', { minimumFractionDigits: 2 })} €</span> a Laura</strong> para estar en balance perfecto al 50/50.
-                                                        </p>
+                                                    <span className="text-[10px] uppercase font-black tracking-widest text-slate-400">Estado de Liquidación Actual</span>
+                                                    {processedData.balanceConsolidado === 0 ? (
+                                                        <h4 className="text-xl font-black text-emerald-400">¡Cuentas al día!</h4>
+                                                    ) : processedData.balanceConsolidado > 0 ? (
+                                                        <h4 className="text-xl font-black text-pink-400">Asier debe compensar a Laura</h4>
                                                     ) : (
-                                                        <p>
-                                                            Teniendo en cuenta el historial mensual y la diferencia del pago del primer hito, <strong className="text-indigo-400">Laura debe compensar un total neto de <span className="text-sm font-black text-indigo-300">{Math.abs(processedData.balanceConsolidadoAsierALaura).toLocaleString('es-ES', { minimumFractionDigits: 2 })} €</span> a Asier</strong> para estar en balance perfecto al 50/50.
-                                                        </p>
+                                                        <h4 className="text-xl font-black text-blue-400">Laura debe compensar a Asier</h4>
                                                     )}
+                                                    <p className="text-slate-400 text-[11px] leading-relaxed max-w-xl">
+                                                        Este balance se calcula sumando el desequilibrio inicial, restando lo devuelto en efectivo y sumando la diferencia mensual.
+                                                        <span className="block mt-1 text-slate-500 font-semibold">
+                                                            💡 <strong>Nota matemática:</strong> Para equilibrar cuentas mediante una transferencia directa, el pago es siempre la <strong>mitad de la diferencia</strong>. Si Laura ha aportado 20 € más, Asier solo le transfiere 10 € a ella (así Laura tiene 20 € netos y Asier 20 € netos, quedando iguales).
+                                                        </span>
+                                                    </p>
+                                                </div>
+                                                <div className={`p-4 rounded-xl border flex flex-col items-center shrink-0 w-full md:w-auto text-center ${processedData.balanceConsolidado > 0 ? 'bg-pink-500/5 border-pink-500/20 text-pink-400' : processedData.balanceConsolidado < 0 ? 'bg-blue-500/5 border-blue-500/20 text-blue-400' : 'bg-emerald-500/5 border-emerald-500/20 text-emerald-400'}`}>
+                                                    <span className="text-[10px] uppercase font-black tracking-widest block opacity-75">Compensación Neta</span>
+                                                    <strong className="text-2xl font-black block tracking-tight mt-0.5">
+                                                        {Math.abs(processedData.balanceConsolidado).toLocaleString('es-ES', { minimumFractionDigits: 2 })} €
+                                                    </strong>
+                                                    <span className="text-[9px] font-semibold mt-1 opacity-90">
+                                                        {processedData.balanceConsolidado === 0 ? "Aportación equitativa" : `Para balance perfecto (50%)`}
+                                                    </span>
                                                 </div>
                                             </div>
-                                        )}
+                                        </div>
+
+                                        {/* TABLA DE BALANCE LEDGER COMPACTA Y ULTRA INTUITIVA */}
+                                        <div className="overflow-x-auto rounded-2xl border border-slate-800/80 bg-slate-950/40">
+                                            <table className="w-full text-left border-collapse text-xs">
+                                                <thead>
+                                                    <tr className="bg-slate-950 text-slate-400 font-black uppercase tracking-wider text-[10px] border-b border-slate-800">
+                                                        <th className="p-4">Concepto / Hito</th>
+                                                        <th className="p-4 text-right text-pink-400">Laura Aportó</th>
+                                                        <th className="p-4 text-right text-blue-400">Asier Aportó</th>
+                                                        <th className="p-4 text-right text-white">Total Proyecto</th>
+                                                        <th className="p-4 text-right text-slate-300">Diferencia</th>
+                                                        <th className="p-4 text-right text-indigo-400">Ajuste 50/50</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-slate-850">
+                                                    {/* Entrada Inicial */}
+                                                    <tr className="hover:bg-slate-900/30 transition">
+                                                        <td className="p-4 font-bold text-white flex flex-col gap-0.5">
+                                                            <span>Entrada Inicial (10%)</span>
+                                                            <span className="text-[10px] text-slate-500 font-medium">Primer hito de pago de vivienda</span>
+                                                        </td>
+                                                        <td className="p-4 text-right font-semibold text-slate-300">{lauraInitialPayment.toLocaleString('es-ES')} €</td>
+                                                        <td className="p-4 text-right font-semibold text-slate-300">{asierInitialPayment.toLocaleString('es-ES')} €</td>
+                                                        <td className="p-4 text-right font-bold text-white">{processedData.totalInicial.toLocaleString('es-ES')} €</td>
+                                                        <td className="p-4 text-right font-semibold text-amber-400">
+                                                            {processedData.diferenciaInicial > 0 ? `+${processedData.diferenciaInicial.toLocaleString('es-ES')} € Laura` : processedData.diferenciaInicial < 0 ? `+${Math.abs(processedData.diferenciaInicial).toLocaleString('es-ES')} € Asier` : 'Sin diferencia'}
+                                                        </td>
+                                                        <td className="p-4 text-right font-bold text-indigo-300">
+                                                            {processedData.compensacionInicialIdeal > 0 ? `Asier debe ${processedData.compensacionInicialIdeal.toLocaleString('es-ES')} €` : processedData.compensacionInicialIdeal < 0 ? `Laura debe ${Math.abs(processedData.compensacionInicialIdeal).toLocaleString('es-ES')} €` : '0 €'}
+                                                        </td>
+                                                    </tr>
+
+                                                    {/* Devoluciones */}
+                                                    <tr className="hover:bg-slate-900/30 transition bg-slate-900/10">
+                                                        <td className="p-4 font-bold text-white flex flex-col gap-0.5">
+                                                            <span>Reembolsos Directos</span>
+                                                            <span className="text-[10px] text-slate-500 font-medium">Asier ha devuelto directamente a Laura</span>
+                                                        </td>
+                                                        <td className="p-4 text-right font-semibold text-emerald-400">+{repaidToLaura.toLocaleString('es-ES')} €</td>
+                                                        <td className="p-4 text-right font-semibold text-rose-400">-{repaidToLaura.toLocaleString('es-ES')} €</td>
+                                                        <td className="p-4 text-right text-slate-500 font-medium">Transferencia interna</td>
+                                                        <td className="p-4 text-right font-semibold text-emerald-400">
+                                                            -{ (repaidToLaura * 2).toLocaleString('es-ES') } € diferencia
+                                                        </td>
+                                                        <td className="p-4 text-right font-bold text-emerald-400">
+                                                            -{repaidToLaura.toLocaleString('es-ES')} € pendiente
+                                                        </td>
+                                                    </tr>
+
+                                                    {/* Ahorro Mensual */}
+                                                    <tr className="hover:bg-slate-900/30 transition">
+                                                        <td className="p-4 font-bold text-white flex flex-col gap-0.5">
+                                                            <span>Ahorro Mensual (Histórico)</span>
+                                                            <span className="text-[10px] text-slate-500 font-medium">Suma de depósitos recurrentes en Revolut</span>
+                                                        </td>
+                                                        <td className="p-4 text-right font-semibold text-slate-300">{processedData.totalLaura.toLocaleString('es-ES')} €</td>
+                                                        <td className="p-4 text-right font-semibold text-slate-300">{processedData.totalAsier.toLocaleString('es-ES')} €</td>
+                                                        <td className="p-4 text-right font-bold text-white">{processedData.totalMensual.toLocaleString('es-ES')} €</td>
+                                                        <td className="p-4 text-right font-semibold text-amber-400">
+                                                            {processedData.diferenciaMensual > 0 ? `+${processedData.diferenciaMensual.toLocaleString('es-ES')} € Laura` : processedData.diferenciaMensual < 0 ? `+${Math.abs(processedData.diferenciaMensual).toLocaleString('es-ES')} € Asier` : 'Sin diferencia'}
+                                                        </td>
+                                                        <td className="p-4 text-right font-bold text-indigo-300">
+                                                            {processedData.compensacionMensualIdeal > 0 ? `Asier debe ${processedData.compensacionMensualIdeal.toLocaleString('es-ES')} €` : processedData.compensacionMensualIdeal < 0 ? `Laura debe ${Math.abs(processedData.compensacionMensualIdeal).toLocaleString('es-ES')} €` : '0 €'}
+                                                        </td>
+                                                    </tr>
+
+                                                    {/* TOTAL NETO CONSOLIDADO */}
+                                                    <tr className="bg-slate-900 text-white font-black border-t-2 border-slate-800">
+                                                        <td className="p-4 font-extrabold text-[13px] uppercase tracking-wider text-cyan-400">Total Neto Consolidado</td>
+                                                        <td className="p-4 text-right text-[13px] text-pink-400">{processedData.totalLauraNeto.toLocaleString('es-ES')} €</td>
+                                                        <td className="p-4 text-right text-[13px] text-blue-400">{processedData.totalAsierNeto.toLocaleString('es-ES')} €</td>
+                                                        <td className="p-4 text-right text-[13px] text-white">{processedData.totalGeneralProyecto.toLocaleString('es-ES')} €</td>
+                                                        <td className="p-4 text-right text-[13px] text-amber-400">
+                                                            {processedData.diferenciaNetaGlobal > 0 ? `+${processedData.diferenciaNetaGlobal.toLocaleString('es-ES')} € Laura` : processedData.diferenciaNetaGlobal < 0 ? `+${Math.abs(processedData.diferenciaNetaGlobal).toLocaleString('es-ES')} € Asier` : 'Equilibrado'}
+                                                        </td>
+                                                        <td className="p-4 text-right text-[13px] text-indigo-400">
+                                                            {processedData.balanceConsolidado > 0 ? (
+                                                                <span className="text-pink-300">Asier paga {processedData.balanceConsolidado.toLocaleString('es-ES')} €</span>
+                                                            ) : processedData.balanceConsolidado < 0 ? (
+                                                                <span className="text-blue-300">Laura paga {Math.abs(processedData.balanceConsolidado).toLocaleString('es-ES')} €</span>
+                                                            ) : (
+                                                                <span className="text-emerald-400">Equilibrado al 50%</span>
+                                                            )}
+                                                        </td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
+
+                                        {/* EDITOR DE REEMBOLSOS DIRECTOS (ACORDEÓN / FORMULARIO INTEGRADO) */}
+                                        <div className="p-5 bg-slate-950/50 rounded-2xl border border-slate-800/80 flex flex-col md:flex-row items-center justify-between gap-4">
+                                            <div className="space-y-1 text-xs">
+                                                <span className="text-slate-300 font-extrabold text-xs block flex items-center gap-1.5">
+                                                    <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full"></span>
+                                                    Registrar Devolución de la Entrada
+                                                </span>
+                                                <p className="text-[10px] text-slate-500">¿Cuánto dinero le ha transferido Asier a Laura en mano o Bizum para compensar el primer pago del 10%?</p>
+                                            </div>
+                                            <div className="flex items-center gap-2 w-full md:w-auto shrink-0">
+                                                <input 
+                                                    type="text" 
+                                                    className="bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs font-black text-white w-28 text-center focus:outline-none focus:border-cyan-500" 
+                                                    value={tempRepaidAmount}
+                                                    onChange={e => setTempRepaidAmount(e.target.value)}
+                                                />
+                                                <button onClick={saveRepaidAmount} className="bg-cyan-600 hover:bg-cyan-500 text-white text-[10px] font-black uppercase px-4 py-2.5 rounded-xl transition shrink-0 flex items-center gap-1.5 shadow-lg shadow-cyan-500/20">
+                                                    {SVGIcons.save} Actualizar
+                                                </button>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             )}
