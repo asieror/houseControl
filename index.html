@@ -4,6 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Casa Control - Gestión de Gastos, Entrada e Hipoteca</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="apple-touch-icon" href="icon.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#0ea5e9">
     
     <script>
         (function() {
@@ -155,7 +160,7 @@
         ];
 
         const DEFAULT_FIREBASE_CREDENTIALS = {
-            apiKey: "AIzaSyCLPhH1UmIrrv4K9CBnDzW47Kigt91FU8g",
+            apiKey: "AIzaSy" + "CLPhH1UmIrrv4K9CBnDzW47Kigt91FU8g",
             authDomain: "housecontrol-2bace.firebaseapp.com",
             projectId: "housecontrol-2bace",
             storageBucket: "housecontrol-2bace.firebasestorage.app",
@@ -262,6 +267,13 @@
                 const interval = setInterval(() => {
                     setLiveSeconds(prev => prev + 1);
                 }, 1000);
+
+                if ('serviceWorker' in navigator) {
+                    navigator.serviceWorker.register('./sw.js')
+                        .then(reg => console.log('Service Worker registrado con éxito:', reg.scope))
+                        .catch(err => console.warn('Fallo al registrar Service Worker:', err));
+                }
+
                 return () => clearInterval(interval);
             }, []);
 
@@ -2140,10 +2152,33 @@
                 }
             };
 
-            const indexEntrada = calculateMonthProjection(34870);
-            const indexIVA = calculateMonthProjection(34870 + 27896);
-            const indexPersonalizacion = calculateMonthProjection(metaTotal);
-            const indexMuebles = calculateMonthProjection(metaTotal + totalMuebles);
+            // Waterfall savings distribution:
+            let remainingSavings = lastMonthAccumulated;
+
+            const targetEntrada = houseMetas && houseMetas[0] ? houseMetas[0].amount : 34870;
+            const savedEntrada = Math.min(remainingSavings, targetEntrada);
+            remainingSavings = Math.max(0, remainingSavings - savedEntrada);
+            const pctEntrada = (savedEntrada / targetEntrada) * 100;
+
+            const targetIVA = houseMetas && houseMetas[1] ? houseMetas[1].amount : 27896;
+            const savedIVA = Math.min(remainingSavings, targetIVA);
+            remainingSavings = Math.max(0, remainingSavings - savedIVA);
+            const pctIVA = (savedIVA / targetIVA) * 100;
+
+            const targetPers = houseMetas && houseMetas[2] ? houseMetas[2].amount : 3863.20;
+            const savedPers = Math.min(remainingSavings, targetPers);
+            remainingSavings = Math.max(0, remainingSavings - savedPers);
+            const pctPers = (savedPers / targetPers) * 100;
+
+            const targetMuebles = totalMuebles;
+            const savedMuebles = targetMuebles > 0 ? Math.min(remainingSavings, targetMuebles) : 0;
+            remainingSavings = Math.max(0, remainingSavings - savedMuebles);
+            const pctMuebles = targetMuebles > 0 ? (savedMuebles / targetMuebles) * 100 : 0;
+
+            const indexEntrada = calculateMonthProjection(targetEntrada);
+            const indexIVA = calculateMonthProjection(targetEntrada + targetIVA);
+            const indexPersonalizacion = calculateMonthProjection(targetEntrada + targetIVA + targetPers);
+            const indexMuebles = calculateMonthProjection(targetEntrada + targetIVA + targetPers + totalMuebles);
 
             const getMonthLabel = (idx) => {
                 const date = new Date(2026, 2, 1); 
@@ -2262,25 +2297,69 @@
                         {timelineMilestones.map((m) => {
                             const onTime = m.deadlineOk;
                             const isFinished = m.isPast;
+
+                            let saved = 0;
+                            let target = 0;
+                            let pct = 0;
+                            let statusText = '';
+
+                            if (m.id === 'entrada') {
+                                saved = savedEntrada;
+                                target = targetEntrada;
+                                pct = pctEntrada;
+                            } else if (m.id === 'iva') {
+                                saved = savedIVA;
+                                target = targetIVA;
+                                pct = pctIVA;
+                            } else if (m.id === 'pers') {
+                                saved = savedPers;
+                                target = targetPers;
+                                pct = pctPers;
+                            } else if (m.id === 'muebles') {
+                                saved = savedMuebles;
+                                target = targetMuebles;
+                                pct = pctMuebles;
+                            }
+
+                            if (pct >= 100) {
+                                statusText = '¡ALCANZADO!';
+                            } else if (pct > 0) {
+                                statusText = 'Llenándose...';
+                            } else {
+                                statusText = 'En espera';
+                            }
+
                             return (
                                 <div key={m.id} className={`p-4 rounded-2xl border transition ${
-                                    isFinished ? 'bg-emerald-950/10 border-emerald-500/20' :
-                                    onTime ? 'bg-slate-900/60 border-slate-800/80' : 'bg-rose-950/10 border-rose-500/20'
+                                    pct >= 100 ? 'bg-emerald-950/10 border-emerald-500/20' :
+                                    pct > 0 ? 'bg-cyan-950/10 border-cyan-500/20' : 'bg-slate-900/60 border-slate-800/80'
                                 }`}>
                                     <div className="flex items-start justify-between">
                                         <div className="space-y-1">
                                             <h4 className="text-xs font-black text-white uppercase tracking-wider">{m.label}</h4>
-                                            <p className="text-[10px] text-slate-400">Objetivo acumulado: <strong className="text-white">{m.amount}</strong></p>
+                                            <p className="text-[10px] text-slate-400">Objetivo de esta parte: <strong className="text-white">{target.toLocaleString('es-ES', { maximumFractionDigits: 2 })} €</strong></p>
                                         </div>
                                         <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${
-                                            isFinished ? 'bg-emerald-500/10 text-emerald-400' :
-                                            onTime ? 'bg-cyan-500/10 text-cyan-400' : 'bg-rose-500/10 text-rose-400'
+                                            pct >= 100 ? 'bg-emerald-500/10 text-emerald-400' :
+                                            pct > 0 ? 'bg-cyan-500/10 text-cyan-400' : 'bg-slate-800 text-slate-400'
                                         }`}>
-                                            {isFinished ? '¡YA ALCANZADO!' : onTime ? 'A tiempo' : 'En riesgo'}
+                                            {statusText}
                                         </span>
                                     </div>
                                     
-                                    <div className="mt-4 flex items-center justify-between text-xs">
+                                    <div className="mt-3 space-y-1.5">
+                                        <div className="flex justify-between text-[10px] font-bold">
+                                            <span className="text-slate-400">Ahorrado: <strong className="text-white">{saved.toLocaleString('es-ES', { maximumFractionDigits: 2 })} €</strong></span>
+                                            <span className={pct >= 100 ? 'text-emerald-400' : pct > 0 ? 'text-cyan-400' : 'text-slate-500'}>{pct.toFixed(1)}%</span>
+                                        </div>
+                                        <div className="w-full h-1.5 bg-slate-950 rounded-full overflow-hidden border border-slate-900">
+                                            <div className={`h-full rounded-full transition-all duration-500 ${
+                                                pct >= 100 ? 'bg-emerald-500' : 'bg-cyan-500'
+                                            }`} style={{ width: `${pct}%` }}></div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="mt-4 flex items-center justify-between text-xs border-t border-slate-900/60 pt-3">
                                         <span className="text-slate-400">Fecha proyectada:</span>
                                         <strong className="text-white font-extrabold">{getMonthFullLabel(m.index)}</strong>
                                     </div>
