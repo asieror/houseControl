@@ -798,6 +798,24 @@
                 };
             }, [interestRate, loanTermYears]);
 
+            const getMonthsRemainingToDeadline = (monthName) => {
+                const parsed = parseMonthName(monthName);
+                const year = Number(parsed.year);
+                const monthIndex = monthsList.indexOf(parsed.month); // 0 to 11
+                if (monthIndex === -1) return 1;
+                const deadlineYear = 2028;
+                const deadlineMonthIndex = 8; // September is index 8
+                const diff = (deadlineYear - year) * 12 + (deadlineMonthIndex - monthIndex);
+                return Math.max(1, diff + 1); // include current month
+            };
+
+            const getRecommendedSaving = (monthName, prevRevolut) => {
+                const monthsRemaining = getMonthsRemainingToDeadline(monthName);
+                const remainingFurniture = (processedData.totalMueblesPresupuesto || 0) - (processedData.totalMueblesGastado || 0);
+                const totalNeeded = (metaTotal || 0) + remainingFurniture - Number(prevRevolut || 0);
+                return Math.max(0, Math.ceil(totalNeeded / monthsRemaining));
+            };
+
             const getPrevRevolutForEdit = (monthId) => {
                 const idx = contributions.findIndex(c => c.id === monthId);
                 if (idx > 0) {
@@ -1603,7 +1621,7 @@
                                     {isAddingMonth && (
                                         <div className="bg-slate-900 border border-emerald-500/30 rounded-3xl p-5 space-y-4 shadow-xl">
                                             <h3 className="font-bold text-emerald-400 flex items-center gap-1.5 text-sm">{SVGIcons.plus} Registrar Nuevo Mes</h3>
-                                            <div className="grid grid-cols-2 md:grid-cols-8 gap-3">
+                                            <div className="grid grid-cols-2 md:grid-cols-9 gap-3">
                                                 <div>
                                                     <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Mes</label>
                                                     <select 
@@ -1725,14 +1743,30 @@
                                                         }} 
                                                     />
                                                 </div>
-                                                <div>
+                                                <div className="col-span-2 md:col-span-2">
                                                     <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Plan Simulación (€)</label>
-                                                    <input 
-                                                        type="number" 
-                                                        className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white text-xs font-bold" 
-                                                        value={newMonthForm.simulacion} 
-                                                        onChange={e => setNewMonthForm({ ...newMonthForm, simulacion: Number(e.target.value) })} 
-                                                    />
+                                                    <div className="relative">
+                                                        <input 
+                                                            type="number" 
+                                                            className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white text-xs font-bold pr-16" 
+                                                            value={newMonthForm.simulacion} 
+                                                            onChange={e => setNewMonthForm({ ...newMonthForm, simulacion: Number(e.target.value) })} 
+                                                        />
+                                                        <button 
+                                                            type="button"
+                                                            onClick={() => {
+                                                                const monthName = `${newMonthForm.month} ${newMonthForm.year}`;
+                                                                const prevRevolut = contributions.length > 0 ? Number(contributions[contributions.length - 1].revolut) : saldoInicial;
+                                                                setNewMonthForm(prev => ({ ...prev, simulacion: getRecommendedSaving(monthName, prevRevolut) }));
+                                                            }}
+                                                            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[9px] font-black uppercase text-amber-400 hover:text-amber-300 transition"
+                                                        >
+                                                            Rec.
+                                                        </button>
+                                                    </div>
+                                                    <p className="text-[9px] text-slate-500 mt-1">
+                                                        Recomendado: <strong className="text-amber-400">{getRecommendedSaving(`${newMonthForm.month} ${newMonthForm.year}`, contributions.length > 0 ? Number(contributions[contributions.length - 1].revolut) : saldoInicial).toLocaleString("es-ES")} €</strong> ({getMonthsRemainingToDeadline(`${newMonthForm.month} ${newMonthForm.year}`)} meses rest.)
+                                                    </p>
                                                 </div>
                                             </div>
                                             <div className="flex justify-end gap-2">
@@ -1745,7 +1779,7 @@
                                     {editingMonth && (
                                         <div className="bg-slate-900 border border-cyan-500/30 rounded-3xl p-5 space-y-4 shadow-xl">
                                             <h3 className="font-bold text-cyan-400 flex items-center gap-1.5 text-sm">{SVGIcons.edit} Editar Mes Seleccionado</h3>
-                                            <div className="grid grid-cols-2 md:grid-cols-8 gap-3">
+                                            <div className="grid grid-cols-2 md:grid-cols-9 gap-3">
                                                 <div>
                                                     <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Mes</label>
                                                     <select 
@@ -1863,14 +1897,30 @@
                                                         }} 
                                                     />
                                                 </div>
-                                                <div>
+                                                <div className="col-span-2 md:col-span-2">
                                                     <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Plan Simulación (€)</label>
-                                                    <input 
-                                                        type="number" 
-                                                        className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white text-xs font-bold" 
-                                                        value={editForm.simulacion} 
-                                                        onChange={e => setEditForm({ ...editForm, simulacion: Number(e.target.value) })} 
-                                                    />
+                                                    <div className="relative">
+                                                        <input 
+                                                            type="number" 
+                                                            className="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-white text-xs font-bold pr-16" 
+                                                            value={editForm.simulacion} 
+                                                            onChange={e => setEditForm({ ...editForm, simulacion: Number(e.target.value) })} 
+                                                        />
+                                                        <button 
+                                                            type="button"
+                                                            onClick={() => {
+                                                                const monthName = `${editForm.month} ${editForm.year}`;
+                                                                const prevRevolut = getPrevRevolutForEdit(editingMonth);
+                                                                setEditForm(prev => ({ ...prev, simulacion: getRecommendedSaving(monthName, prevRevolut) }));
+                                                            }}
+                                                            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[9px] font-black uppercase text-cyan-400 hover:text-cyan-300 transition"
+                                                        >
+                                                            Rec.
+                                                        </button>
+                                                    </div>
+                                                    <p className="text-[9px] text-slate-500 mt-1">
+                                                        Recomendado: <strong className="text-cyan-400">{getRecommendedSaving(`${editForm.month} ${editForm.year}`, getPrevRevolutForEdit(editingMonth)).toLocaleString("es-ES")} €</strong> ({getMonthsRemainingToDeadline(`${editForm.month} ${editForm.year}`)} meses rest.)
+                                                    </p>
                                                 </div>
                                             </div>
                                             <div className="flex justify-end gap-2">
