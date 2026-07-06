@@ -245,7 +245,7 @@
             const [newMonthForm, setNewMonthForm] = useState({ month: "Enero", year: "2026", laura: 0, asier: 0, pagos: 0, pagoCompletado: false, revolut: 0, simulacion: 0 });
             const [isNewRevolutManuallyEdited, setIsNewRevolutManuallyEdited] = useState(false);
             
-            const [newFurniture, setNewFurniture] = useState({ category: "", item: "", amount: 0, priority: "Media" });
+            const [newFurniture, setNewFurniture] = useState({ category: "", item: "", amount: 0, priority: "Media", url: "" });
             
             useEffect(() => {
                 setTempCorrection(String(revolutCorrection || 0));
@@ -771,6 +771,79 @@
                     fechaCompletoLabel
                 };
             }, [processedData, targetMonthlySaving, metaTotal, contributions]);
+
+            const executedTransactions = useMemo(() => {
+                const txs = [];
+
+                houseMetas.forEach(m => {
+                    if (m.completed) {
+                        const monthName = m.assignedMonthId ? (contributions.find(c => c.id === m.assignedMonthId)?.name) : null;
+                        const parts = m.assignedMonthId ? m.assignedMonthId.split('_') : [];
+                        const timestamp = m.assignedMonthId ? Number(parts[parts.length - 1] || 0) : Date.now();
+                        txs.push({
+                            id: m.id,
+                            type: 'meta',
+                            label: m.label,
+                            amount: m.amount,
+                            date: monthName || 'Firma de Contrato/Escritura',
+                            timestamp: timestamp
+                        });
+                    }
+                });
+
+                furnitureBudget.forEach(f => {
+                    if (f.status === 'Comprado') {
+                        const monthName = f.assignedMonthId ? (contributions.find(c => c.id === f.assignedMonthId)?.name) : null;
+                        const parts = f.assignedMonthId ? f.assignedMonthId.split('_') : [];
+                        const timestamp = f.assignedMonthId ? Number(parts[parts.length - 1] || 0) : Date.now();
+                        txs.push({
+                            id: f.id,
+                            type: 'furniture',
+                            label: f.item,
+                            amount: f.amount,
+                            date: monthName || 'Compra Realizada',
+                            timestamp: timestamp
+                        });
+                    }
+                });
+
+                contributions.forEach(c => {
+                    if (c.pagoCompletado && Number(c.pagos) > 0) {
+                        const linkedFurnitureSum = furnitureBudget
+                            .filter(f => f.status === 'Comprado' && f.assignedMonthId === c.id)
+                            .reduce((sum, f) => sum + Number(f.amount), 0);
+                        const linkedMetaSum = houseMetas
+                            .filter(m => m.completed && m.assignedMonthId === c.id)
+                            .reduce((sum, m) => sum + Number(m.amount), 0);
+
+                        const otherAmount = Number(c.pagos) - (linkedFurnitureSum + linkedMetaSum);
+                        if (otherAmount > 0.01) {
+                            const parts = c.id.split('_');
+                            const timestamp = Number(parts[parts.length - 1] || 0) || 1;
+                            txs.push({
+                                id: 'other_' + c.id,
+                                type: 'other',
+                                label: 'Gastos de Obra / Cuota Mensual',
+                                amount: otherAmount,
+                                date: c.name,
+                                timestamp: timestamp
+                            });
+                        }
+                    }
+                });
+
+                return txs.sort((a, b) => b.timestamp - a.timestamp);
+            }, [contributions, houseMetas, furnitureBudget, processedData]);
+
+            const groupedFurniture = useMemo(() => {
+                const groups = {};
+                furnitureBudget.forEach(item => {
+                    const cat = item.category || 'Otros';
+                    if (!groups[cat]) groups[cat] = [];
+                    groups[cat].push(item);
+                });
+                return groups;
+            }, [furnitureBudget]);
 
             const hipotecaData = useMemo(() => {
                 const valorVivienda = 348700;
@@ -1990,7 +2063,6 @@
                                                         </button>
                                                     </div>
                                                 </div>
-                                                </div>
                                                 <div>
                                                     <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Saldo Revolut (€)</label>
                                                     <input 
@@ -2140,7 +2212,6 @@
                                                             {editForm.pagoCompletado ? '✓ Pagado' : '⚠ Pendiente'}
                                                         </button>
                                                     </div>
-                                                </div>
                                                 </div>
                                                 <div>
                                                     <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1">Saldo Revolut (€)</label>
