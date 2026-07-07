@@ -246,6 +246,8 @@
             const [isNewRevolutManuallyEdited, setIsNewRevolutManuallyEdited] = useState(false);
             
             const [newFurniture, setNewFurniture] = useState({ category: "", item: "", amount: 0, priority: "Media", url: "" });
+            const [editingFurnitureId, setEditingFurnitureId] = useState(null);
+            const [editFurnitureForm, setEditFurnitureForm] = useState({ category: "", item: "", amount: 0, priority: "Media", url: "" });
             
             useEffect(() => {
                 setTempCorrection(String(revolutCorrection || 0));
@@ -1264,6 +1266,50 @@
 
                 updateContributionsAndPersist(updatedContributions, updatedMetas, null);
                 addNotification("Mes de pago de hito modificado y saldos recalculados");
+            };
+
+            const saveEditFurniture = (id) => {
+                if (!editFurnitureForm.category || !editFurnitureForm.item || !editFurnitureForm.amount) {
+                    addNotification("Completa todos los campos obligatorios", "error");
+                    return;
+                }
+
+                let updatedContributions = [...contributions];
+                const oldItem = furnitureBudget.find(f => f.id === id);
+                if (!oldItem) return;
+
+                const amountDiff = Number(editFurnitureForm.amount) - Number(oldItem.amount);
+
+                const updatedFurniture = furnitureBudget.map(f => {
+                    if (f.id === id) {
+                        return {
+                            ...f,
+                            category: editFurnitureForm.category,
+                            item: editFurnitureForm.item,
+                            amount: Number(editFurnitureForm.amount),
+                            spent: f.status === 'Comprado' ? Number(editFurnitureForm.amount) : 0,
+                            priority: editFurnitureForm.priority,
+                            url: editFurnitureForm.url || ''
+                        };
+                    }
+                    return f;
+                });
+
+                if (oldItem.status === 'Comprado' && oldItem.assignedMonthId && amountDiff !== 0) {
+                    updatedContributions = contributions.map(c => {
+                        if (c.id === oldItem.assignedMonthId) {
+                            return {
+                                ...c,
+                                pagos: Number((Number(c.pagos || 0) + amountDiff).toFixed(2))
+                            };
+                        }
+                        return c;
+                    });
+                }
+
+                updateContributionsAndPersist(updatedContributions, null, updatedFurniture);
+                setEditingFurnitureId(null);
+                addNotification("Partida de gasto actualizada");
             };
 
             const settleBalanceDirect = () => {
@@ -2486,77 +2532,169 @@
 
                                                                 {/* Lista de artículos */}
                                                                 <div className="divide-y divide-slate-850/60">
-                                                                    {items.map((item) => (
-                                                                        <div key={item.id} className="p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 hover:bg-slate-900/20 transition">
-                                                                            <div className="space-y-1 flex-1">
-                                                                                <div className="flex items-center gap-2">
-                                                                                    <span className={`text-[9px] font-black px-1.5 py-0.2 rounded uppercase ${
-                                                                                        item.priority === 'Alta' ? 'bg-rose-500/10 text-rose-400' :
-                                                                                        item.priority === 'Media' ? 'bg-amber-500/10 text-amber-400' :
-                                                                                        'bg-slate-800 text-slate-500'
-                                                                                    }`}>Prioridad {item.priority}</span>
-                                                                                    {item.status === 'Comprado' && (
-                                                                                        <span className="text-[9px] font-black uppercase bg-emerald-500/10 text-emerald-400 px-1.5 py-0.2 rounded">✓ PAGADO</span>
-                                                                                    )}
-                                                                                </div>
-                                                                                <div className="flex items-center gap-1.5 mt-0.5">
-                                                                                    <h5 className="font-bold text-white text-xs">{item.item}</h5>
-                                                                                    {item.url && (
-                                                                                        <a 
-                                                                                            href={item.url} 
-                                                                                            target="_blank" 
-                                                                                            rel="noopener noreferrer" 
-                                                                                            className="text-cyan-400 hover:text-cyan-300 transition"
-                                                                                            title="Ver producto en la web"
-                                                                                        >
-                                                                                            <svg className="w-3.5 h-3.5 fill-none stroke-current stroke-2" viewBox="0 0 24 24">
-                                                                                                <path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244" />
-                                                                                            </svg>
-                                                                                        </a>
-                                                                                    )}
-                                                                                </div>
-                                                                                
-                                                                                {item.status === 'Comprado' && (
-                                                                                    <div className="mt-2.5 pt-1.5 border-t border-slate-900/40 max-w-xs">
-                                                                                        <label className="block text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Imputar al Mes de</label>
-                                                                                        <select 
-                                                                                            value={item.assignedMonthId || ""} 
-                                                                                            onChange={(e) => changeFurnitureMonth(item.id, e.target.value)}
-                                                                                            className="bg-slate-950 border border-slate-850 rounded-lg p-1.5 text-[9px] font-bold text-white focus:outline-none w-full"
-                                                                                        >
-                                                                                            <option value="">Compra Realizada (Fijo)</option>
-                                                                                            {contributions.map(c => (
-                                                                                                <option key={c.id} value={c.id}>{c.name}</option>
-                                                                                            ))}
-                                                                                        </select>
+                                                                    {items.map((item) => {
+                                                                        const isEditing = editingFurnitureId === item.id;
+                                                                        
+                                                                        if (isEditing) {
+                                                                            return (
+                                                                                <div key={item.id} className="p-4 bg-slate-900/40 border border-pink-500/25 rounded-2xl space-y-3 animate-fadeIn">
+                                                                                    <div className="grid grid-cols-1 sm:grid-cols-4 gap-2">
+                                                                                        <div>
+                                                                                            <label className="block text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Habitación / Estancia</label>
+                                                                                            <input 
+                                                                                                type="text" 
+                                                                                                className="w-full bg-slate-950 border border-slate-800 rounded-lg p-1.5 text-xs text-white focus:outline-none focus:border-pink-500"
+                                                                                                value={editFurnitureForm.category}
+                                                                                                onChange={e => setEditFurnitureForm({...editFurnitureForm, category: e.target.value})}
+                                                                                            />
+                                                                                        </div>
+                                                                                        <div>
+                                                                                            <label className="block text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Artículo</label>
+                                                                                            <input 
+                                                                                                type="text" 
+                                                                                                className="w-full bg-slate-950 border border-slate-800 rounded-lg p-1.5 text-xs text-white focus:outline-none focus:border-pink-500"
+                                                                                                value={editFurnitureForm.item}
+                                                                                                onChange={e => setEditFurnitureForm({...editFurnitureForm, item: e.target.value})}
+                                                                                            />
+                                                                                        </div>
+                                                                                        <div>
+                                                                                            <label className="block text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Precio Estimado (€)</label>
+                                                                                            <input 
+                                                                                                type="number" 
+                                                                                                className="w-full bg-slate-950 border border-slate-800 rounded-lg p-1.5 text-xs font-bold text-white focus:outline-none focus:border-pink-500"
+                                                                                                value={editFurnitureForm.amount || ""}
+                                                                                                onChange={e => setEditFurnitureForm({...editFurnitureForm, amount: Number(e.target.value)})}
+                                                                                            />
+                                                                                        </div>
+                                                                                        <div>
+                                                                                            <label className="block text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Enlace URL</label>
+                                                                                            <input 
+                                                                                                type="text" 
+                                                                                                className="w-full bg-slate-950 border border-slate-800 rounded-lg p-1.5 text-xs text-white focus:outline-none focus:border-pink-500"
+                                                                                                value={editFurnitureForm.url}
+                                                                                                onChange={e => setEditFurnitureForm({...editFurnitureForm, url: e.target.value})}
+                                                                                            />
+                                                                                        </div>
                                                                                     </div>
-                                                                                )}
-                                                                            </div>
+                                                                                    <div className="flex justify-between items-center gap-2">
+                                                                                        <select 
+                                                                                            className="bg-slate-950 border border-slate-800 rounded-lg p-1.5 text-[10px] font-bold text-white focus:outline-none max-w-xs"
+                                                                                            value={editFurnitureForm.priority}
+                                                                                            onChange={e => setEditFurnitureForm({...editFurnitureForm, priority: e.target.value})}
+                                                                                        >
+                                                                                            <option value="Alta">Prioridad Alta</option>
+                                                                                            <option value="Media">Prioridad Media</option>
+                                                                                            <option value="Baja">Prioridad Baja</option>
+                                                                                        </select>
+                                                                                        <div className="flex gap-2">
+                                                                                            <button 
+                                                                                                type="button"
+                                                                                                onClick={() => setEditingFurnitureId(null)}
+                                                                                                className="px-3 py-1.5 bg-slate-855 hover:bg-slate-800 text-slate-400 hover:text-white text-[9px] font-black uppercase tracking-wider rounded-xl transition"
+                                                                                            >
+                                                                                                Cancelar
+                                                                                            </button>
+                                                                                            <button 
+                                                                                                type="button"
+                                                                                                onClick={() => saveEditFurniture(item.id)}
+                                                                                                className="px-4 py-1.5 bg-pink-600 hover:bg-pink-500 text-white text-[9px] font-black uppercase tracking-wider rounded-xl transition shadow-md shadow-pink-600/10"
+                                                                                            >
+                                                                                                Guardar
+                                                                                            </button>
+                                                                                        </div>
+                                                                                    </div>
+                                                                                </div>
+                                                                            );
+                                                                        }
 
-                                                                            <div className="flex items-center gap-4 shrink-0 w-full sm:w-auto justify-between sm:justify-end">
-                                                                                <div className="text-right">
-                                                                                    <div className="text-xs font-black text-white">{item.amount.toLocaleString('es-ES')} €</div>
-                                                                                    <span className={`text-[9px] font-bold uppercase ${item.status === 'Comprado' ? 'text-emerald-400' : 'text-slate-500'}`}>{item.status}</span>
+                                                                        return (
+                                                                            <div key={item.id} className="p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 hover:bg-slate-900/20 transition">
+                                                                                <div className="space-y-1 flex-1">
+                                                                                    <div className="flex items-center gap-2">
+                                                                                        <span className={`text-[9px] font-black px-1.5 py-0.2 rounded uppercase ${
+                                                                                            item.priority === 'Alta' ? 'bg-rose-500/10 text-rose-400' :
+                                                                                            item.priority === 'Media' ? 'bg-amber-500/10 text-amber-400' :
+                                                                                            'bg-slate-800 text-slate-500'
+                                                                                        }`}>Prioridad {item.priority}</span>
+                                                                                        {item.status === 'Comprado' && (
+                                                                                            <span className="text-[9px] font-black uppercase bg-emerald-500/10 text-emerald-400 px-1.5 py-0.2 rounded">✓ PAGADO</span>
+                                                                                        )}
+                                                                                    </div>
+                                                                                    <div className="flex items-center gap-1.5 mt-0.5">
+                                                                                        <h5 className="font-bold text-white text-xs">{item.item}</h5>
+                                                                                        {item.url && (
+                                                                                            <a 
+                                                                                                href={item.url} 
+                                                                                                target="_blank" 
+                                                                                                rel="noopener noreferrer" 
+                                                                                                className="text-cyan-400 hover:text-cyan-300 transition"
+                                                                                                title="Ver producto en la web"
+                                                                                            >
+                                                                                                <svg className="w-3.5 h-3.5 fill-none stroke-current stroke-2" viewBox="0 0 24 24">
+                                                                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244" />
+                                                                                                </svg>
+                                                                                            </a>
+                                                                                        )}
+                                                                                    </div>
+                                                                                    
+                                                                                    {item.status === 'Comprado' && (
+                                                                                        <div className="mt-2.5 pt-1.5 border-t border-slate-900/40 max-w-xs">
+                                                                                            <label className="block text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1">Imputar al Mes de</label>
+                                                                                            <select 
+                                                                                                value={item.assignedMonthId || ""} 
+                                                                                                onChange={(e) => changeFurnitureMonth(item.id, e.target.value)}
+                                                                                                className="bg-slate-950 border border-slate-850 rounded-lg p-1.5 text-[9px] font-bold text-white focus:outline-none w-full"
+                                                                                            >
+                                                                                                <option value="">Compra Realizada (Fijo)</option>
+                                                                                                {contributions.map(c => (
+                                                                                                    <option key={c.id} value={c.id}>{c.name}</option>
+                                                                                                ))}
+                                                                                            </select>
+                                                                                        </div>
+                                                                                    )}
                                                                                 </div>
 
-                                                                                <div className="flex gap-1.5">
-                                                                                    <button 
-                                                                                        onClick={() => toggleFurnitureStatus(item.id)} 
-                                                                                        className={`px-2.5 py-1.5 rounded-xl transition text-[9px] font-black uppercase tracking-wider flex items-center gap-1.5 ${
-                                                                                            item.status === 'Comprado' ? 'bg-emerald-500/15 text-emerald-400' : 'bg-slate-850 text-slate-400 hover:text-white border border-slate-800'
-                                                                                        }`}
-                                                                                        title={item.status === 'Comprado' ? 'Marcar como Pendiente' : 'Marcar como Comprado'}
-                                                                                    >
-                                                                                        <span className={`w-1 h-1 rounded-full ${item.status === 'Comprado' ? 'bg-emerald-400' : 'bg-slate-500'}`}></span>
-                                                                                        {item.status === 'Comprado' ? 'Comprado' : 'Comprar'}
-                                                                                    </button>
-                                                                                    <button onClick={() => deleteFurnitureItem(item.id)} className="p-2 bg-slate-850 hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 rounded-xl transition">
-                                                                                        {SVGIcons.trash}
-                                                                                    </button>
+                                                                                <div className="flex items-center gap-4 shrink-0 w-full sm:w-auto justify-between sm:justify-end">
+                                                                                    <div className="text-right">
+                                                                                        <div className="text-xs font-black text-white">{item.amount.toLocaleString('es-ES')} €</div>
+                                                                                        <span className={`text-[9px] font-bold uppercase ${item.status === 'Comprado' ? 'text-emerald-400' : 'text-slate-500'}`}>{item.status}</span>
+                                                                                    </div>
+
+                                                                                    <div className="flex gap-1.5">
+                                                                                        <button 
+                                                                                            onClick={() => {
+                                                                                                setEditingFurnitureId(item.id);
+                                                                                                setEditFurnitureForm({
+                                                                                                    category: item.category,
+                                                                                                    item: item.item,
+                                                                                                    amount: item.amount,
+                                                                                                    priority: item.priority || 'Media',
+                                                                                                    url: item.url || ''
+                                                                                                });
+                                                                                            }}
+                                                                                            className="p-2 bg-slate-855 hover:bg-slate-750 text-slate-400 hover:text-white rounded-xl transition"
+                                                                                            title="Editar partida"
+                                                                                        >
+                                                                                            {SVGIcons.edit}
+                                                                                        </button>
+                                                                                        <button 
+                                                                                            onClick={() => toggleFurnitureStatus(item.id)} 
+                                                                                            className={`px-2.5 py-1.5 rounded-xl transition text-[9px] font-black uppercase tracking-wider flex items-center gap-1.5 ${
+                                                                                                item.status === 'Comprado' ? 'bg-emerald-500/15 text-emerald-400' : 'bg-slate-850 text-slate-400 hover:text-white border border-slate-800'
+                                                                                            }`}
+                                                                                            title={item.status === 'Comprado' ? 'Marcar como Pendiente' : 'Marcar como Comprado'}
+                                                                                        >
+                                                                                            <span className={`w-1 h-1 rounded-full ${item.status === 'Comprado' ? 'bg-emerald-400' : 'bg-slate-500'}`}></span>
+                                                                                            {item.status === 'Comprado' ? 'Comprado' : 'Comprar'}
+                                                                                        </button>
+                                                                                        <button onClick={() => deleteFurnitureItem(item.id)} className="p-2 bg-slate-850 hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 rounded-xl transition">
+                                                                                            {SVGIcons.trash}
+                                                                                        </button>
+                                                                                    </div>
                                                                                 </div>
                                                                             </div>
-                                                                        </div>
-                                                                    ))}
+                                                                        );
+                                                                    })}
                                                                 </div>
                                                             </div>
                                                         );
